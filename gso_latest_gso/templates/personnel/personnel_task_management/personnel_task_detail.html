@@ -1,0 +1,179 @@
+{% extends "personnel/personnel_base_dashboard.html" %}
+{% block title %}Task Detail{% endblock %}
+
+{% block main_content %}
+<div class="header d-flex justify-content-between align-items-center mb-4">
+  <h1 class="page-title">Task Detail</h1>
+  <a href="{% url 'gso_requests:personnel_task_management' %}" class="btn btn-secondary btn-sm">← Back to Tasks</a>
+</div>
+
+<!-- ===== TASK INFORMATION CARD ===== -->
+<div class="card shadow-sm border-0 rounded-4 mb-4">
+  <div class="card-body">
+    <div class="row g-4">
+      <div class="col-md-6">
+        <div class="d-flex flex-column gap-2">
+          <p><strong class="text-secondary">Request ID:</strong> <span class="text-dark fw-semibold">#{{ task.id }}</span></p>
+          <p><strong class="text-secondary">Date Submitted:</strong> {{ task.created_at|date:"Y-m-d H:i" }}</p>
+          <p><strong class="text-secondary">Requestor:</strong> {{ task.full_name }}</p>
+          <p><strong class="text-secondary">Requesting Office:</strong> {{ task.requestor.department }}</p>
+          <p><strong class="text-secondary">Unit:</strong> {{ task.unit|title }}</p>
+          <p><strong class="text-secondary">Attachment:</strong><br>
+            {% if task.attachment %}
+              <a href="{{ task.attachment.url }}" target="_blank">
+                <img src="{{ task.attachment.url }}" alt="Attachment"
+                     style="max-width: 200px; height: auto; border-radius: 8px; cursor: pointer;">
+              </a>
+            {% else %}
+              <span class="text-muted">No attachment provided.</span>
+            {% endif %}
+          </p>
+        </div>
+      </div>
+
+      <div class="col-md-6">
+        <div class="d-flex flex-column gap-3">
+          <!-- Status -->
+          <div>
+            <strong class="text-secondary">Status:</strong>
+            <span class="badge fs-6 px-3 py-2 rounded-pill
+              {% if task.status == 'Pending' %} bg-warning text-dark
+              {% elif task.status == 'Approved' %} bg-info text-dark
+              {% elif task.status == 'In Progress' %} bg-primary
+              {% elif task.status == 'Done for Review' %} bg-secondary
+              {% elif task.status == 'Completed' %} bg-success
+              {% elif task.status == 'Cancelled' %} bg-danger
+              {% else %} bg-light text-dark {% endif %}">
+              {{ task.status }}
+            </span>
+          </div>
+
+          <!-- Description -->
+          <div>
+            <strong class="text-secondary">Description:</strong>
+            <div class="p-3 mt-2 border rounded-3 bg-light-subtle text-dark">
+              {{ task.description|default:"No description provided." }}
+            </div>
+          </div>
+
+          <!-- ✅ NEW: Success Indicator Selection -->
+          {% if task.status in "Approved,In Progress" %}
+          <form method="post" class="mt-2">
+            {% csrf_token %}
+            <label for="success_indicator" class="fw-semibold text-secondary">Success Indicator:</label>
+            <select name="success_indicator" id="success_indicator" class="form-select mb-3">
+              <option value="">-- Select Success Indicator --</option>
+              {% for si in indicators %}
+                <option value="{{ si.id }}" {% if task.selected_indicator_id == si.id %}selected{% endif %}>
+                  {{ si.code }}
+                </option>
+              {% endfor %}
+            </select>
+            <div class="d-flex justify-content-end">
+              <button type="submit" name="save_indicator" class="btn btn-outline-primary btn-sm">
+                <i class="bi bi-save"></i> Save Indicator
+              </button>
+            </div>
+          </form>
+          {% endif %}
+        </div>
+      </div>
+    </div>
+
+    <!-- Action Buttons -->
+    {% if task.status in "Approved,In Progress" %}
+      <div class="d-flex justify-content-end mt-4">
+        <form method="post" class="d-flex gap-2">
+          {% csrf_token %}
+          {% if task.status == "Approved" %}
+            <button type="submit" name="start" class="btn btn-primary px-4">
+              <i class="bi bi-play-fill"></i> Start Task
+            </button>
+          {% elif task.status == "In Progress" %}
+            <button type="submit" name="done" class="btn btn-success px-4">
+              <i class="bi bi-check2-circle"></i> Mark as Done (For Review)
+            </button>
+          {% endif %}
+        </form>
+      </div>
+    {% endif %}
+  </div>
+</div>
+
+<!-- ===== MATERIALS SECTION ===== -->
+<div class="card shadow-sm border-0 rounded-4 mb-4">
+  <div class="card-header text-white fw-bold" style="background-color: #002e72;">
+    <i class="bi bi-clipboard-check me-2"></i> Materials Used
+  </div>
+
+  <div class="card-body">
+    {% if materials %}
+      <div class="table-responsive">
+        <table class="table align-middle table-sm mb-0">
+          <thead class="table-light">
+            <tr>
+              <th>Material</th>
+              <th>Quantity</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for rm in materials %}
+            <tr>
+              <td>{{ rm.material.name }}</td>
+              <td><span class="badge bg-primary">{{ rm.quantity }} {{ rm.material.unit_of_measurement }}</span></td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    {% else %}
+      <p class="text-muted mb-0">No materials assigned for this task.</p>
+    {% endif %}
+  </div>
+</div>
+
+<!-- ===== PROGRESS REPORTS SECTION ===== -->
+<div class="card shadow-sm border-0 rounded-4">
+  <div class="card-header text-white fw-bold" style="background-color: #002e72;">
+    <i class="bi bi-clipboard-check me-2"></i> Progress Reports
+  </div>
+
+  <div class="card-body">
+    {% if reports %}
+      <ul class="list-group mb-4">
+        {% for r in reports %}
+        <li class="list-group-item border-0 border-bottom">
+          <div class="d-flex justify-content-between align-items-start">
+            <div>
+              <strong>{{ r.personnel.get_full_name|default:r.personnel.username }}</strong>
+              <p class="mb-1 mt-1">{{ r.report_text }}</p>
+            </div>
+            <small class="text-muted">{{ r.created_at|date:"Y-m-d H:i" }}</small>
+          </div>
+        </li>
+        {% endfor %}
+      </ul>
+    {% else %}
+      <p class="text-muted">No reports submitted yet.</p>
+    {% endif %}
+
+    {% if task.status == "In Progress" %}
+    <form method="post" class="mt-3">
+      {% csrf_token %}
+      <div class="mb-3">
+        <textarea 
+          name="report_text" 
+          class="form-control shadow-sm" 
+          rows="3" 
+          placeholder="Write your progress report here..."></textarea>
+      </div>
+      <div class="d-flex justify-content-end">
+        <button type="submit" name="add_report" class="btn btn-success px-4">
+          <i class="bi bi-save"></i> Save Report
+        </button>
+      </div>
+    </form>
+    {% endif %}
+  </div>
+</div>
+{% endblock %}

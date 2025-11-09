@@ -1,0 +1,56 @@
+{% extends "gso_office/gso_base_dashboard.html" %}
+{% block title %}Analytics{% endblock %}
+
+{% block main_content %}
+<div class="header d-flex flex-wrap align-items-center justify-content-between mb-4">
+  <h1 class="page-title mb-2 mb-md-0" style="font-weight: 700; color: #f8f9fb;">ANALYTICS</h1>
+</div>
+
+<div class="row g-3">
+  <div class="col-md-3">
+    <div class="card shadow-sm text-center p-3">
+      <h6>Total Requests</h6>
+      <h3 class="fw-bold text-primary">{{ total_requests }}</h3>
+    </div>
+  </div>
+  <div class="col-md-3">
+    <div class="card shadow-sm text-center p-3">
+      <h6>Completed</h6>
+      <h3 class="fw-bold text-success">{{ completed_requests }}</h3>
+    </div>
+  </div>
+  <div class="col-md-3">
+    <div class="card shadow-sm text-center p-3">
+      <h6>Pending</h6>
+      <h3 class="fw-bold text-warning">{{ pending_requests }}</h3>
+    </div>
+  </div>
+</div>
+
+<div class="mt-4">
+  <canvas id="requestsChart" height="120"></canvas>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script>
+  const ctx = document.getElementById('requestsChart').getContext('2d');
+  new Chart(ctx, {
+    type: 'bar',
+    data: {
+      labels: ['Completed', 'Pending'],
+      datasets: [{
+        label: 'Requests Overview',
+        data: [{{ completed_requests }}, {{ pending_requests }}],
+        backgroundColor: ['#198754', '#ffc107']
+      }]
+    },
+    options: {
+      responsive: true,
+      plugins: {
+        legend: { display: false },
+        title: { display: true, text: 'Request Status Overview' }
+      }
+    }
+  });
+</script>
+{% endblock %}
