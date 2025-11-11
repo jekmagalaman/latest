@@ -9,7 +9,7 @@ import subprocess
 
 def backup_database():
     """Creates a PostgreSQL database backup (.sql file)."""
-    print("🚀 Starting database backup...")
+    print("Starting database backup...")
 
     timestamp = datetime.datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
     backup_dir = os.path.join(settings.BASE_DIR, 'backups')
@@ -42,11 +42,11 @@ def backup_database():
             "-f", backup_file,
             db_name
         ], check=True, env=env)
-        print(f"✅ Database backup created: {backup_file}")
+        print(f"Database backup created: {backup_file}")
     except subprocess.CalledProcessError as e:
-        print(f"❌ Database backup failed: {e}")
+        print(f"Database backup failed: {e}")
     except FileNotFoundError:
-        print("❌ pg_dump not found. Check your PostgreSQL installation path.")
+        print("pg_dump not found. Check your PostgreSQL installation path.")
     finally:
         env.pop("PGPASSWORD", None)
 
@@ -55,11 +55,11 @@ def backup_database():
 
 def backup_media():
     """Creates a ZIP archive of uploaded media files."""
-    print("📦 Starting media backup...")
+    print("Starting media backup...")
 
     src = settings.MEDIA_ROOT
     if not src or not os.path.exists(src):
-        print("⚠️ MEDIA_ROOT does not exist or is empty. Skipping media backup.")
+        print("MEDIA_ROOT does not exist or is empty. Skipping media backup.")
         return None
 
     timestamp = datetime.datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
@@ -69,17 +69,17 @@ def backup_media():
     archive_name = os.path.join(backup_dir, f'media_backup_{timestamp}')
     shutil.make_archive(archive_name, 'zip', src)
 
-    print(f"✅ Media backup created: {archive_name}.zip")
+    print(f"Media backup created: {archive_name}.zip")
     return f"{archive_name}.zip"
 
 
 def cleanup_old_backups(days=7):
     """Deletes backup files older than the specified number of days."""
-    print(f"🧹 Cleaning up backups older than {days} days...")
+    print(f"Cleaning up backups older than {days} days...")
 
     backup_dir = os.path.join(settings.BASE_DIR, 'backups')
     if not os.path.exists(backup_dir):
-        print("⚠️ No backup directory found. Skipping cleanup.")
+        print("No backup directory found. Skipping cleanup.")
         return
 
     cutoff = time.time() - (days * 86400)
@@ -87,16 +87,16 @@ def cleanup_old_backups(days=7):
     for file in glob.glob(os.path.join(backup_dir, '*')):
         if os.path.getctime(file) < cutoff:
             os.remove(file)
-            print(f"🗑️ Deleted old backup: {file}")
+            print(f"Deleted old backup: {file}")
 
-    print("✅ Old backup cleanup completed.")
+    print("Old backup cleanup completed.")
 
 
 def run_full_backup():
     """Runs the full backup process (database + media + cleanup)."""
-    print("🚀 Starting full backup process...")
+    print("Starting full backup process...")
     db_file = backup_database()
     media_file = backup_media()
     cleanup_old_backups(days=7)
-    print("🎉 Backup process completed!")
+    print("Backup process completed!")
     return db_file, media_file

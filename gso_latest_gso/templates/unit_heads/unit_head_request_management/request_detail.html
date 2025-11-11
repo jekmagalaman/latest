@@ -98,43 +98,64 @@
 </div>
 
 {% if req.status not in "Completed,Cancelled,Done for Review" %}
-<form method="post">
+<!-- ===== PERSONNEL ASSIGNMENT FORM ===== -->
+<form method="post" class="mb-4">
   {% csrf_token %}
+  <input type="hidden" name="form_type" value="assign_personnel">
 
-  <!-- ===== PERSONNEL ASSIGNMENT ===== -->
   <div class="card shadow-sm border-0 mb-4">
     <div class="card-header text-white fw-bold" style="background-color: #002e72;">
       <i class="bi bi-people me-2"></i> Assign Personnel
     </div>
     <div class="card-body">
-      <h6 class="fw-bold text-success">Available Personnel</h6>
-      {% for p in personnel %}
+      {% for ps in personnel_status %}
         <div class="form-check mb-2">
           <input 
             type="checkbox" 
             name="personnel_ids" 
-            value="{{ p.id }}" 
-            id="personnel_{{ p.id }}" 
+            value="{{ ps.user.id }}" 
+            id="personnel_{{ ps.user.id }}" 
             class="form-check-input"
-            {% if p in req.assigned_personnel.all %}checked{% endif %}>
-          <label for="personnel_{{ p.id }}" class="form-check-label">
-            {{ p.get_full_name|default:p.username }}
+            {% if ps.user in req.assigned_personnel.all %}checked{% endif %}>
+          <label for="personnel_{{ ps.user.id }}" class="form-check-label">
+            {{ ps.user.get_full_name|default:ps.user.username }}
+            {% if ps.busy %}
+              <span class="badge bg-danger ms-2" title="Currently busy with {{ ps.active_tasks.count }} task(s)">
+                Busy
+              </span>
+            {% endif %}
           </label>
+
+          {% if ps.busy %}
+            <div class="small text-muted ms-4">
+              <strong>Assigned Tasks:</strong>
+              <ul class="mb-0">
+                {% for task in ps.active_tasks %}
+                  <li>#{{ task.id }} – {{ task.status }}</li>
+                {% endfor %}
+              </ul>
+            </div>
+          {% endif %}
         </div>
       {% empty %}
-        <p class="text-muted">No available personnel.</p>
-      {% endfor %}
-    
-      <h6 class="fw-bold text-danger mt-3">Currently Busy</h6>
-      {% for p in busy_personnel %}
-        <span class="badge bg-secondary">{{ p.get_full_name }}</span>
-      {% empty %}
-        <p class="text-muted">No busy personnel.</p>
+        <p class="text-muted">No personnel available.</p>
       {% endfor %}
     </div>
   </div>
 
-  <!-- ===== MATERIALS ASSIGNMENT ===== -->
+  <div class="text-end">
+    <button type="submit" name="action" value="assign_personnel" class="btn btn-primary px-4">
+      <i class="bi bi-person-check me-1"></i> Save Personnel
+    </button>
+  </div>
+</form>
+
+
+<!-- ===== MATERIAL ASSIGNMENT FORM ===== -->
+<form method="post" class="mb-4">
+  {% csrf_token %}
+  <input type="hidden" name="form_type" value="assign_materials">
+
   <div class="card shadow-sm border-0 rounded-4 mb-4">
     <div class="card-header text-white fw-bold" style="background-color: #002e72;">
       <i class="bi bi-box-seam me-2"></i> Select Materials
@@ -191,8 +212,8 @@
   </div>
 
   <div class="text-end">
-    <button type="submit" name="action" value="assign" class="btn btn-success px-4">
-      <i class="bi bi-save me-1"></i> Save Assignments
+    <button type="submit" name="action" value="assign_materials" class="btn btn-success px-4">
+      <i class="bi bi-box-arrow-down me-1"></i> Save Materials
     </button>
   </div>
 </form>
@@ -252,10 +273,33 @@
   document.querySelectorAll('.material-checkbox').forEach((checkbox) => {
     const row = checkbox.closest('tr');
     const qtyInput = row.querySelector('.material-qty');
+    const availableQty = parseInt(row.querySelector('td:nth-child(3)').innerText); // get available quantity
+
+    // Enable or disable input on page load
+    qtyInput.disabled = !checkbox.checked;
+
+    // Handle checkbox change
     checkbox.addEventListener('change', () => {
-      qtyInput.disabled = !checkbox.checked;
-      if (!checkbox.checked) qtyInput.value = "";
+      if (checkbox.checked) {
+        qtyInput.disabled = false;
+        // Fill default quantity if empty
+        if (!qtyInput.value) qtyInput.value = 1;
+      } else {
+        qtyInput.disabled = true;
+        qtyInput.value = "";
+      }
+    });
+
+    // Validate quantity on input
+    qtyInput.addEventListener('input', () => {
+      if (parseInt(qtyInput.value) > availableQty) {
+        qtyInput.value = availableQty;
+        alert(`Cannot use more than available stock (${availableQty})`);
+      } else if (parseInt(qtyInput.value) < 1 || isNaN(qtyInput.value)) {
+        qtyInput.value = 1;
+      }
     });
   });
 </script>
+
 {% endblock %}

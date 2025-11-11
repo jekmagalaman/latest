@@ -415,12 +415,47 @@ def update_war_success_indicator(request, war_id):
 
 
 
-#GSO Analytics View
+
+
+
+
+
+
+
+
+
+
+# GSO Analytics View
+from django.contrib.auth.decorators import login_required
+from django.shortcuts import render
+from apps.gso_requests.models import ServiceRequest as Request
+from apps.gso_inventory.models import InventoryItem as Material
+
 @login_required
 def gso_analytics(request):
+    # ===== REQUEST ANALYTICS =====
+    total_requests = Request.objects.count()
+    completed_requests = Request.objects.filter(status='Completed').count()
+    pending_requests = Request.objects.filter(status='Pending').count()
+    in_progress_requests = Request.objects.filter(status='In Progress').count()
+
+    # ===== INVENTORY ANALYTICS =====
+    total_materials = Material.objects.count()
+    low_stock_materials = Material.objects.filter(quantity__lte=10).count()  # threshold for low stock
+    out_of_stock = Material.objects.filter(quantity=0).count()
+
+    # ===== CONTEXT =====
     context = {
-        'total_requests': 120,
-        'completed_requests': 95,
-        'pending_requests': 25,
+        # Request analytics
+        'total_requests': total_requests,
+        'completed_requests': completed_requests,
+        'pending_requests': pending_requests,
+        'in_progress_requests': in_progress_requests,
+
+        # Inventory analytics
+        'total_materials': total_materials,
+        'low_stock_materials': low_stock_materials,
+        'out_of_stock': out_of_stock,
     }
+
     return render(request, 'gso_office/analytics/gso_analytics.html', context)

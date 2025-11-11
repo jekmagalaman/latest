@@ -5,16 +5,19 @@ asgiref==3.10.0
 billiard==4.2.2
 celery==5.5.3
 certifi==2025.10.5
+channels==4.3.1
 charset-normalizer==3.4.3
 click==8.3.0
 click-didyoumean==0.3.1
 click-plugins==1.1.1.2
 click-repl==0.3.0
 colorama==0.4.6
+dj-database-url==3.0.1
 Django==5.2.7
 django-widget-tweaks==1.5.0
 et_xmlfile==2.0.0
 fastapi==0.118.0
+gunicorn==23.0.0
 h11==0.16.0
 httptools==0.6.4
 idna==3.10
@@ -46,3 +49,4 @@ vine==5.1.0
 watchfiles==1.1.0
 wcwidth==0.2.14
 websockets==15.0.1
+whitenoise==6.11.0

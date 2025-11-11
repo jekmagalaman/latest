@@ -613,6 +613,8 @@ html, body {
 .modal2-textarea {
   resize: none;
   min-height: 80px;
+  width: 100%;
+  box-sizing: border-box;
 }
 
 /* Attachments */

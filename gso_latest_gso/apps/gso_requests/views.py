@@ -102,29 +102,40 @@ def unit_head_request_management(request):
         "requests": requests_qs
     })
 
+
+
+
+
+
+
+
+
+
+
+
+
 @login_required
 @user_passes_test(is_unit_head)
 def unit_head_request_detail(request, pk):
     service_request = get_object_or_404(ServiceRequest, pk=pk)
 
-    # --- Identify Busy Personnel (assigned to active requests) ---
-    busy_personnel = User.objects.filter(
-        assigned_requests__status__in=["Pending", "Approved", "In Progress"]
-    ).distinct()
-
-    # --- Available Personnel (same unit, active, not busy) ---
-    available_personnel = User.objects.filter(
-        role="personnel",
-        unit=service_request.unit,
-        is_active=True
-    ).exclude(id__in=busy_personnel).order_by("id")
-
-    # --- You can still fetch all personnel for optional display ---
+    # --- All personnel in the same unit (active) ---
     all_personnel = User.objects.filter(
         role="personnel",
         unit=service_request.unit,
         is_active=True
     ).order_by("id")
+
+    personnel_status = []
+    for p in all_personnel:
+        active_tasks = p.assigned_requests.filter(status__in=["Pending", "Approved", "In Progress"])
+        personnel_status.append({
+            "user": p,
+            "busy": active_tasks.exists(),
+            "active_tasks": active_tasks,
+            # Optional: you can track next_free or latest task info
+            "latest_task": active_tasks.order_by('-created_at').first() if active_tasks.exists() else None
+        })
 
     # --- Materials for the same unit ---
     materials = InventoryItem.objects.filter(
@@ -146,6 +157,7 @@ def unit_head_request_detail(request, pk):
 
     # --- Handle Form Submissions ---
     if request.method == "POST":
+        form_type = request.POST.get("form_type")
         action = request.POST.get("action")
 
         # === Save/Update Success Indicator ===
@@ -160,11 +172,27 @@ def unit_head_request_detail(request, pk):
                 messages.warning(request, "⚠️ Please select a valid Success Indicator.")
             return redirect("gso_requests:unit_head_request_detail", pk=pk)
 
-        # === Assign Personnel & Materials ===
-        if action == "assign" and service_request.status not in ["Done for Review", "Completed"]:
-            service_request.assigned_personnel.set(request.POST.getlist("personnel_ids"))
+        # === Assign Personnel (Separate Form, allows assigning busy personnel) ===
+        if form_type == "assign_personnel":
+            assigned_ids = request.POST.getlist("personnel_ids")
+            service_request.assigned_personnel.set(assigned_ids)
 
-            # Reset and return materials to inventory
+            # Optional: Warn if any busy personnel assigned
+            for pid in assigned_ids:
+                user = User.objects.get(pk=pid)
+                active_tasks = user.assigned_requests.filter(status__in=["Pending", "Approved", "In Progress"])
+                if active_tasks.exists():
+                    messages.warning(
+                        request,
+                        f"⚠️ {user.get_full_name()} is currently busy with {active_tasks.count()} task(s)."
+                    )
+
+            messages.success(request, "✅ Personnel assignments saved successfully.")
+            return redirect("gso_requests:unit_head_request_detail", pk=pk)
+
+        # === Assign Materials (Separate Form) ===
+        elif form_type == "assign_materials":
+            # Restore previously used materials to inventory first
             for rm in service_request.requestmaterial_set.all():
                 rm.material.quantity += rm.quantity
                 rm.material.save()
@@ -174,24 +202,22 @@ def unit_head_request_detail(request, pk):
             for material_id in material_ids:
                 qty = request.POST.get(f"quantity_{material_id}")
                 if qty and int(qty) > 0:
-                    material = get_object_or_404(
-                        InventoryItem, pk=material_id, owned_by=service_request.unit
-                    )
+                    material = get_object_or_404(InventoryItem, pk=material_id, owned_by=service_request.unit)
                     qty = int(qty)
                     if material.quantity < qty:
-                        messages.error(request, f"Not enough {material.name}.")
+                        messages.error(request, f"❌ Not enough {material.name} in stock.")
                         return redirect("gso_requests:unit_head_request_detail", pk=pk)
 
+                    # Deduct and assign
                     material.quantity -= qty
                     material.save()
-
                     RequestMaterial.objects.create(
                         request=service_request,
                         material=material,
                         quantity=qty
                     )
 
-            messages.success(request, "✅ Assignments updated successfully.")
+            messages.success(request, "✅ Material assignments saved successfully.")
             return redirect("gso_requests:unit_head_request_detail", pk=pk)
 
         # === Approve Completion (Generate WAR) ===
@@ -201,7 +227,6 @@ def unit_head_request_detail(request, pk):
             service_request.save(update_fields=["status", "completed_at"])
 
             war = create_war_from_request(service_request)
-
             if war and service_request.selected_indicator:
                 war.success_indicator = service_request.selected_indicator
                 war.save(update_fields=["success_indicator"])
@@ -224,14 +249,26 @@ def unit_head_request_detail(request, pk):
     # --- Render Template ---
     return render(request, "unit_heads/unit_head_request_management/request_detail.html", {
         "req": service_request,
-        "personnel": available_personnel,       # 👈 only show available personnel
-        "busy_personnel": busy_personnel,       # 👈 optional if you want to show busy list
+        "personnel_status": personnel_status,  # Updated: all personnel with busy info
         "materials": materials,
         "reports": reports,
         "assigned_materials": assigned_materials,
         "war": war,
         "indicators": indicators,
     })
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 @login_required
@@ -272,14 +309,33 @@ def personnel_task_management(request):
     return render(request, "personnel/personnel_task_management/personnel_task_management.html", {"tasks": tasks})
 
 
+
+
+
+
+
+
+
+
 @login_required
 def personnel_task_detail(request, pk):
-    from apps.gso_reports.models import SuccessIndicator  # avoid circular import
+    from apps.gso_reports.models import SuccessIndicator
+    from apps.gso_inventory.models import InventoryItem
+    from django.db import transaction
 
     task = get_object_or_404(ServiceRequest, pk=pk, assigned_personnel=request.user)
     materials = task.requestmaterial_set.select_related("material")
     reports = task.reports.select_related("personnel").order_by("-created_at")
-    indicators = SuccessIndicator.objects.filter(is_active=True).order_by("code")  # list of all indicators
+    indicators = SuccessIndicator.objects.filter(is_active=True).order_by("code")
+
+    # ✅ Materials available in inventory for this unit
+    available_materials = InventoryItem.objects.filter(
+        is_active=True,
+        owned_by=task.unit
+    ).order_by("name")
+
+    # ✅ Dictionary of already assigned materials (material_id → quantity)
+    assigned_materials = {m.material.id: m.quantity for m in materials}
 
     if request.method == "POST":
         # Start Task
@@ -290,7 +346,6 @@ def personnel_task_detail(request, pk):
 
         # Mark Done
         elif "done" in request.POST and task.status == "In Progress":
-            # Save selected indicator before marking done
             indicator_id = request.POST.get("success_indicator")
             if indicator_id:
                 try:
@@ -309,7 +364,7 @@ def personnel_task_detail(request, pk):
             if report_text:
                 TaskReport.objects.create(request=task, personnel=request.user, report_text=report_text)
 
-        # Save Indicator Only (without changing status)
+        # Save Indicator
         elif "save_indicator" in request.POST:
             indicator_id = request.POST.get("success_indicator")
             if indicator_id:
@@ -320,6 +375,46 @@ def personnel_task_detail(request, pk):
                 except ValueError:
                     messages.error(request, "Invalid indicator selected.")
 
+        # 🆕 Assign Multiple Materials
+        elif request.POST.get("action") == "assign_materials":
+            selected_ids = request.POST.getlist("material_ids")
+
+            with transaction.atomic():
+                # Restore inventory for previously assigned materials (in case of change)
+                for req_mat in materials:
+                    inv_item = req_mat.material
+                    inv_item.quantity += req_mat.quantity
+                    inv_item.save()
+                    req_mat.delete()
+
+                # Assign new selected materials
+                for mid in selected_ids:
+                    qty_field = f"quantity_{mid}"
+                    try:
+                        quantity = int(request.POST.get(qty_field, 0))
+                        material = InventoryItem.objects.get(pk=mid, owned_by=task.unit)
+
+                        if quantity <= 0:
+                            continue
+                        if material.quantity < quantity:
+                            messages.warning(request, f"Not enough stock for {material.name}.")
+                            continue
+
+                        # Deduct from inventory
+                        material.quantity -= quantity
+                        material.save()
+
+                        # Create new RequestMaterial
+                        task.requestmaterial_set.create(
+                            material=material,
+                            quantity=quantity
+                        )
+                    except (ValueError, InventoryItem.DoesNotExist):
+                        continue
+
+            messages.success(request, "Materials updated successfully.")
+            return redirect("gso_requests:personnel_task_detail", pk=task.id)
+
         return redirect("gso_requests:personnel_task_detail", pk=task.id)
 
     return render(request, "personnel/personnel_task_management/personnel_task_detail.html", {
@@ -327,7 +422,27 @@ def personnel_task_detail(request, pk):
         "materials": materials,
         "reports": reports,
         "indicators": indicators,
+        "available_materials": available_materials,
+        "assigned_materials": assigned_materials,  # ✅ Pass to template
     })
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 @login_required
 def personnel_history(request):
@@ -368,9 +483,13 @@ def add_request(request):
             custom_full_name=request.POST.get("custom_full_name") or "",
             custom_email=request.POST.get("custom_email") or "",
             custom_contact_number=request.POST.get("custom_contact_number") or "",
-            attachment=request.FILES.get("attachment"),  # 👈 Handle file upload
+            attachment=request.FILES.get("attachment"),
         )
         return redirect("gso_requests:requestor_request_management")
+    
+
+
+    
 
 
 @login_required
@@ -471,3 +590,6 @@ def update_success_indicator_unit_head(request, request_id):
         "req": service_request,
         "war": war,
     })
+
+
+

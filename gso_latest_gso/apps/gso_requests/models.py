@@ -18,6 +18,7 @@ class ServiceRequest(models.Model):
         ("Done for Review", "Done for Review"),
         ("Completed", "Completed"),
         ("Cancelled", "Cancelled"),
+        ("Emergency", "Emergency"),
     ]
 
     # Who made the request

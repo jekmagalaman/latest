@@ -28,7 +28,7 @@ SECRET_KEY = 'django-insecure-e@$judo+q4t(psgei=y1*+2%!givxb8srq1+q@^kn$1%i%9kgk
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
 
-ALLOWED_HOSTS = []
+ALLOWED_HOSTS = ['127.0.0.1', 'localhost', '192.168.1.27']
 
 
 # Application definition
@@ -54,6 +54,9 @@ INSTALLED_APPS = [
 
     # Third-party apps
     "widget_tweaks",
+
+    'channels',
+
 ]
 
 
@@ -86,6 +89,49 @@ TEMPLATES = [
 ]
 
 WSGI_APPLICATION = 'core.wsgi.application'
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+# Channels ASGI application
+ASGI_APPLICATION = 'core.asgi.application'
+
+# Channel layer for local testing
+CHANNEL_LAYERS = {
+    "default": {
+        "BACKEND": "channels.layers.InMemoryChannelLayer",
+    },
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 # Database
@@ -161,5 +207,10 @@ HF_API_KEY = os.getenv("HUGGINGFACE_API_TOKEN")
 #CELERY_ACCEPT_CONTENT = ['json']
 #CELERY_TASK_SERIALIZER = 'json'
 #CELERY_RESULT_SERIALIZER = 'json'
+
+
+
+
+
 
 

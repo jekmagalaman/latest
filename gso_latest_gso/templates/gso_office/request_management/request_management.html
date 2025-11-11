@@ -163,14 +163,6 @@
         </div>
       </div>
 
-      <div class="modal-footer">
-        <form id="approveForm" method="POST" action="">
-          {% csrf_token %}
-          <button type="submit" class="approve-btn">
-            <i class="bi bi-check-circle me-1"></i> Approve Request
-          </button>
-        </form>
-      </div>
     </div>
   </div>
 </div>
@@ -186,10 +178,6 @@ function openModal(id, date, requestor, office, unit, description, status, perso
   document.getElementById("modal-personnel").textContent = personnel || "Unassigned";
   document.getElementById("modal-materials").textContent = materials || "No materials assigned";
   document.getElementById("modal-reports").innerHTML = reports || "No reports submitted";
-
-  const approveForm = document.getElementById("approveForm");
-  approveForm.action = "{% url 'gso_requests:approve_request' 0 %}".replace("0", id);
-  approveForm.style.display = (status === "Pending" && personnel && personnel.trim() !== "") ? "block" : "none";
 
   new bootstrap.Modal(document.getElementById("requestModal")).show();
 }
