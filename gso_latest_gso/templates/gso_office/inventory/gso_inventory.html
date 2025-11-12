@@ -3,102 +3,103 @@
 
 {% block title %}Inventory{% endblock %}
 
-{% block main_content %}
-<!-- ======= HEADER ======= -->
-<div class="header d-flex align-items-center justify-content-between mb-3" style="background-color: #002e72; padding: 1rem 1.5rem; border-radius: 10px; box-shadow: 0 2px 4px rgba(0,0,0,0.05);">
-  <h1 class="page-title" style="font-weight: 700; color: #f8f9fb;">INVENTORY</h1>
 
-  <div class="d-flex gap-2">
-    <!-- Search + Category Filter -->
-    <form method="get" class="d-flex gap-2">
-      <input 
-        type="text" 
-        name="q" 
-        class="form-control form-control-sm" 
-        placeholder="Search items..." 
-        value="{{ search_query|default:'' }}" 
-        autocomplete="off"
-      >
 
-      <select 
-        name="category" 
-        class="form-select form-select-sm" 
-        onchange="this.form.submit()"
-      >
-        <option value="">All Categories</option>
-        {% for c in categories %}
-          <option value="{{ c }}" {% if request.GET.category == c %}selected{% endif %}>
-            {{ c }}
-          </option>
-        {% endfor %}
-      </select>
-    </form>
+{% block page_header %}
+<h1 class="page-title mb-0">Inventory</h1>
+{% endblock %}
 
-    <!-- Add Material Button -->
-    <button 
-      class="btn btn-success btn-sm" 
-      data-bs-toggle="modal" 
-      data-bs-target="#addMaterialModal"
+{% block page_filter %}
+<!-- Unit filter -->
+<div class="d-flex gap-2">
+  <!-- Search + Category Filter -->
+  <form method="get" class="d-flex gap-2">
+    <input 
+      type="text" 
+      name="q" 
+      class="form-control form-control-sm" 
+      placeholder="Search items..." 
+      value="{{ search_query|default:'' }}" 
+      autocomplete="off"
     >
-      + Add Material
-    </button>
-  </div>
-</div>
 
+    <select 
+      name="category" 
+      class="form-select form-select-sm" 
+      onchange="this.form.submit()"
+    >
+      <option value="">All Categories</option>
+      {% for c in categories %}
+        <option value="{{ c }}" {% if request.GET.category == c %}selected{% endif %}>
+          {{ c }}
+        </option>
+      {% endfor %}
+    </select>
+  </form>
+
+  <!-- Add Material Button -->
+  <button 
+    class="btn btn-success btn-sm" 
+    data-bs-toggle="modal" 
+    data-bs-target="#addMaterialModal"
+  >
+    + Add Material
+  </button>
+</div>
+{% endblock %}
+
+
+
+{% block main_content %}
 
 <!-- ======= INVENTORY TABLE ======= -->
-<div class="card border-0 shadow-sm rounded-4 overflow-hidden">
-  <div class="card-body p-0">
-    <div class="table-responsive">
-      <table class="table align-middle mb-0">
-        <thead class="bg-light text-secondary text-uppercase small">
-          <tr>
-            <th class="ps-3 py-3 text-center">#</th>
-            <th class="text-center">Material Name</th>
-            <th class="text-center">Quantity</th>
-            <th class="text-center">Category</th>
-            <th class="text-center">Owned By (Unit)</th>
-            <th class="text-center">Action</th>
-          </tr>
-        </thead>
-
-        <tbody>
-          {% for item in inventory_items %}
-          <tr class="align-middle hover-row">
-            <td class="ps-3 text-muted text-center">{{ forloop.counter }}</td>
-            <td class="fw-semibold text-dark text-center">{{ item.name }}</td>
-            <td class="text-center">{{ item.quantity }} {{ item.unit_of_measurement|default:"—" }}</td>
-            <td class="text-center">{{ item.category|default:"—" }}</td>
-            <td class="text-center">{{ item.owned_by.name|default:"—" }}</td>
-            <td class="text-center">
+<div class="table-responsive">
+  <table class="table align-middle table-hover request-table">
+    <thead class="table-light">
+      <tr>
+        <th class="ps-3 py-3 text-center">#</th>
+        <th class="text-center">Material Name</th>
+        <th class="text-center">Quantity</th>
+        <th class="text-center">Category</th>
+        <th class="text-center">Owned By (Unit)</th>
+        <th class="text-center">Action</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for item in inventory_items %}
+        <tr class="align-middle hover-row">
+          <td class="ps-3 text-muted text-center">{{ forloop.counter }}</td>
+          <td class="fw-semibold text-dark text-center">{{ item.name }}</td>
+          <td class="text-center">{{ item.quantity }} {{ item.unit_of_measurement|default:"—" }}</td>
+          <td class="text-center">{{ item.category|default:"—" }}</td>
+          <td class="text-center">{{ item.owned_by.name|default:"—" }}</td>
+          <td class="text-center">
+            <button 
+                class="btn btn-primary btn-sm" 
+                data-bs-toggle="modal" 
+                data-bs-target="#editMaterialModal{{ item.id }}"
+              >
+                Edit
+              </button>
+              |
               <button 
-                  class="btn btn-primary btn-sm" 
-                  data-bs-toggle="modal" 
-                  data-bs-target="#editMaterialModal{{ item.id }}"
-                >
-                  Edit
-                </button>
-                |
-                <button 
-                  class="btn btn-danger btn-sm" 
-                  data-bs-toggle="modal" 
-                  data-bs-target="#deleteMaterialModal{{ item.id }}"
-                >
-                  Delete
-                </button>
-            </td>
-          </tr>
-          {% empty %}
-          <tr>
-            <td colspan="6" class="text-center text-muted py-4">
-              <i class="bi bi-inbox me-1"></i> No materials found.
-            </td>
-          </tr>
-          {% endfor %}
-        </tbody>
-      </table>
-    </div>
-  </div>
+                class="btn btn-danger btn-sm" 
+                data-bs-toggle="modal" 
+                data-bs-target="#deleteMaterialModal{{ item.id }}"
+              >
+                Delete
+              </button>
+          </td>
+        </tr>
+        {% empty %}
+        <tr>
+          <td colspan="6" class="text-center text-muted py-4">
+            <i class="bi bi-inbox me-1"></i> No materials found.
+          </td>
+        </tr>
+      {% endfor %}
+    </tbody>
+  </table>
 </div>
 
 <!-- ======= MODALS ======= -->
@@ -236,3 +237,5 @@
   </div>
 </div>
 {% endblock %}
+
+

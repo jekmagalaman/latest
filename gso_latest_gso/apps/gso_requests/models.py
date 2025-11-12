@@ -36,6 +36,9 @@ class ServiceRequest(models.Model):
     custom_contact_number = models.CharField(max_length=50, blank=True, null=True)
     attachment = models.ImageField(upload_to='request_attachments/', blank=True, null=True)
 
+
+    is_emergency=models.BooleanField(default=False)
+
     # Details
     activity_name = models.CharField(  # ✅ Auto-filled from keywords/AI
         max_length=255,

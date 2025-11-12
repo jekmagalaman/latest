@@ -133,7 +133,6 @@ def unit_head_request_detail(request, pk):
             "user": p,
             "busy": active_tasks.exists(),
             "active_tasks": active_tasks,
-            # Optional: you can track next_free or latest task info
             "latest_task": active_tasks.order_by('-created_at').first() if active_tasks.exists() else None
         })
 
@@ -172,12 +171,11 @@ def unit_head_request_detail(request, pk):
                 messages.warning(request, "⚠️ Please select a valid Success Indicator.")
             return redirect("gso_requests:unit_head_request_detail", pk=pk)
 
-        # === Assign Personnel (Separate Form, allows assigning busy personnel) ===
+        # === Assign Personnel ===
         if form_type == "assign_personnel":
             assigned_ids = request.POST.getlist("personnel_ids")
             service_request.assigned_personnel.set(assigned_ids)
 
-            # Optional: Warn if any busy personnel assigned
             for pid in assigned_ids:
                 user = User.objects.get(pk=pid)
                 active_tasks = user.assigned_requests.filter(status__in=["Pending", "Approved", "In Progress"])
@@ -190,9 +188,9 @@ def unit_head_request_detail(request, pk):
             messages.success(request, "✅ Personnel assignments saved successfully.")
             return redirect("gso_requests:unit_head_request_detail", pk=pk)
 
-        # === Assign Materials (Separate Form) ===
+        # === Assign Materials ===
         elif form_type == "assign_materials":
-            # Restore previously used materials to inventory first
+            # Restore previously used materials
             for rm in service_request.requestmaterial_set.all():
                 rm.material.quantity += rm.quantity
                 rm.material.save()
@@ -208,7 +206,6 @@ def unit_head_request_detail(request, pk):
                         messages.error(request, f"❌ Not enough {material.name} in stock.")
                         return redirect("gso_requests:unit_head_request_detail", pk=pk)
 
-                    # Deduct and assign
                     material.quantity -= qty
                     material.save()
                     RequestMaterial.objects.create(
@@ -241,6 +238,23 @@ def unit_head_request_detail(request, pk):
             messages.warning(request, "⚠️ Request sent back to In Progress.")
             return redirect("gso_requests:unit_head_request_detail", pk=pk)
 
+        # === MARK AS EMERGENCY ===
+        elif action == "set_emergency":
+            service_request.is_emergency = True
+            service_request.status = "Emergency"
+            service_request.save(update_fields=["is_emergency", "status"])
+            messages.success(request, "🚨 Request has been marked as EMERGENCY.")
+            return redirect("gso_requests:unit_head_request_detail", pk=pk)
+
+        # === REMOVE EMERGENCY TAG ===
+        elif action == "unset_emergency":
+            service_request.is_emergency = False
+            # Restore status to Pending (or In Progress if you prefer)
+            service_request.status = "Pending"
+            service_request.save(update_fields=["is_emergency", "status"])
+            messages.info(request, "❎ Emergency tag removed from this request.")
+            return redirect("gso_requests:unit_head_request_detail", pk=pk)
+
     # --- Assigned Materials (for editing) ---
     assigned_materials = {
         rm.material.id: rm.quantity for rm in service_request.requestmaterial_set.all()
@@ -249,13 +263,19 @@ def unit_head_request_detail(request, pk):
     # --- Render Template ---
     return render(request, "unit_heads/unit_head_request_management/request_detail.html", {
         "req": service_request,
-        "personnel_status": personnel_status,  # Updated: all personnel with busy info
+        "personnel_status": personnel_status,
         "materials": materials,
         "reports": reports,
         "assigned_materials": assigned_materials,
         "war": war,
         "indicators": indicators,
     })
+
+
+
+
+
+
 
 
 

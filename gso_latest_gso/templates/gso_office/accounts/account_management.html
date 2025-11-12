@@ -2,40 +2,45 @@
 
 {% block title %}Account Management{% endblock %}
 
+
+
+<!-- ===== HEADER ===== -->
+{% block page_header %}
+<h1 class="page-title mb-0">Account Management</h1>
+{% endblock %}
+
+{% block page_filter %}
+<div class="d-flex gap-2">
+    <!-- Search + Status Filter -->
+    <form method="get" action="{% url 'gso_accounts:account_management' %}" class="d-flex gap-2">
+        <input 
+            type="text" 
+            name="q" 
+            class="form-control form-control-sm" 
+            placeholder="Search users..." 
+            value="{{ request.GET.q|default:'' }}"
+            autocomplete="off"
+        >
+
+        <select name="status" class="form-select form-select-sm" onchange="this.form.submit()">
+            <option value="">All Status</option>
+            <option value="active" {% if request.GET.status == 'active' %}selected{% endif %}>Active</option>
+            <option value="inactive" {% if request.GET.status == 'inactive' %}selected{% endif %}>Inactive</option>
+        </select>
+    </form>
+
+    <!-- Add Account Button -->
+    <a href="{% url 'gso_accounts:add_user' %}" class="btn btn-success btn-sm">+ Add Account</a>
+</div>
+{% endblock %}
+ 
+
 {% block main_content %}
 <div class="account-management">
 
-  <!-- ===== HEADER ===== -->
-  <div class="header d-flex align-items-center justify-content-between mb-3" style="background-color: #002e72; padding: 1rem 1.5rem; border-radius: 10px; box-shadow: 0 2px 4px rgba(0,0,0,0.05);">
-    <h1 class="page-title" style="font-weight: 700; color: #f8f9fb;">ACCOUNT MANAGEMENT</h1>
-
-        <div class="d-flex gap-2">
-            <!-- Search + Status Filter -->
-            <form method="get" action="{% url 'gso_accounts:account_management' %}" class="d-flex gap-2">
-                <input 
-                    type="text" 
-                    name="q" 
-                    class="form-control form-control-sm" 
-                    placeholder="Search users..." 
-                    value="{{ request.GET.q|default:'' }}"
-                    autocomplete="off"
-                >
-
-                <select name="status" class="form-select form-select-sm" onchange="this.form.submit()">
-                    <option value="">All Status</option>
-                    <option value="active" {% if request.GET.status == 'active' %}selected{% endif %}>Active</option>
-                    <option value="inactive" {% if request.GET.status == 'inactive' %}selected{% endif %}>Inactive</option>
-                </select>
-            </form>
-
-            <!-- Add Account Button -->
-            <a href="{% url 'gso_accounts:add_user' %}" class="btn btn-success btn-sm">+ Add Account</a>
-        </div>
-    </div>
-
   <!-- ===== TABLE ===== -->
-  <div class="table-responsive shadow-sm rounded-3 border bg-white">
-    <table class="table table-hover align-middle mb-0">
+  <div class="table-responsive">
+    <table class="table align-middle table-hover request-table">
       <thead class="table-light">
         <tr>
           <th style="width: 5%;">#</th>

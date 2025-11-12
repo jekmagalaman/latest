@@ -23,7 +23,7 @@ from django.contrib.auth.forms import PasswordChangeForm
 def role_redirect(request):
     role_map = {
         "director": "gso_requests:director_request_management",
-        "gso": "gso_requests:request_management",
+        "gso": "gso_reports:gso_analytics",
         "unit_head": "gso_requests:unit_head_request_management",
         "personnel": "gso_requests:personnel_task_management",
         "requestor": "gso_requests:requestor_request_management",
@@ -74,52 +74,6 @@ def account_management(request):
     users = users.order_by(role_order, 'last_name', 'first_name')  # optional secondary sort
 
     return render(request, "gso_office/accounts/account_management.html", {"users": users})
-
-
-
-
-
-@login_required
-def edit_user(request, user_id):
-    user = get_object_or_404(User, id=user_id)
-    if request.method == "POST":
-        form = UserEditForm(request.POST, instance=user)
-        if form.is_valid():
-            user = form.save(commit=False)
-
-            user.is_active = (user.account_status == "active")
-
-            # Password update
-            new_pass = form.cleaned_data.get("new_password")
-            confirm_pass = form.cleaned_data.get("confirm_password")
-
-            if new_pass:
-                if new_pass == confirm_pass:
-                    user.set_password(new_pass)
-                else:
-                    form.add_error("confirm_password", "Passwords do not match.")
-                    return render(request, "gso_office/accounts/account_edit.html", {"form": form, "user": user})
-
-            user.save()
-            return redirect("gso_accounts:account_management")
-    else:
-        form = UserEditForm(instance=user)
-
-    return render(request, "gso_office/accounts/account_edit.html", {"form": form, "user": user})
-
-@login_required
-def add_user(request):
-    if request.method == "POST":
-        form = UserForm(request.POST)
-        if form.is_valid():
-            user = form.save(commit=False)
-            user.password = make_password(form.cleaned_data["password"])
-            user.save()
-            return redirect("gso_accounts:account_management")
-    else:
-        form = UserForm()
-    return render(request, "gso_office/accounts/add_user.html", {"form": form})
-
 
 
 
@@ -345,3 +299,59 @@ def personnel_account_management(request):
         'user': user,
         'form': password_form
     })
+
+
+
+
+
+
+
+
+
+
+# GSO OFFICE ACCOUNTS MANAGENMENT - EDIT USER
+@login_required
+def edit_user(request, user_id):
+    user = get_object_or_404(User, id=user_id)
+    if request.method == "POST":
+        form = UserEditForm(request.POST, instance=user)
+        if form.is_valid():
+            user = form.save(commit=False)
+
+            user.is_active = (user.account_status == "active")
+
+            # Password update
+            new_pass = form.cleaned_data.get("new_password")
+            confirm_pass = form.cleaned_data.get("confirm_password")
+
+            if new_pass:
+                if new_pass == confirm_pass:
+                    user.set_password(new_pass)
+                else:
+                    form.add_error("confirm_password", "Passwords do not match.")
+                    return render(request, "gso_office/accounts/account_edit.html", {"form": form, "user": user})
+
+            user.save()
+            return redirect("gso_accounts:account_management")
+    else:
+        form = UserEditForm(instance=user)
+
+    return render(request, "gso_office/accounts/account_edit.html", {"form": form, "user": user})
+
+
+
+
+
+
+@login_required
+def add_user(request):
+    if request.method == "POST":
+        form = UserForm(request.POST)
+        if form.is_valid():
+            user = form.save(commit=False)
+            user.password = make_password(form.cleaned_data["password"])
+            user.save()
+            return redirect("gso_accounts:account_management")
+    else:
+        form = UserForm()
+    return render(request, "gso_office/accounts/add_user.html", {"form": form})

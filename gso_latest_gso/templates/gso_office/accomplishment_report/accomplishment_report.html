@@ -2,177 +2,39 @@
 
 {% block title %}Work Accomplishment Report{% endblock %}
 
-{% block main_content %}
-<style>
-  /* === Global Enhancements === */
-  .page-title {
-    font-weight: 700;
-    color: #f8f9fb;
-  }
 
-  .header {
-    background: #002e72;
-    border-radius: 10px;
-    padding: 1rem 1.5rem;
-    box-shadow: 0 2px 4px rgba(0,0,0,0.05);
-  }
-
-  select.form-select {
-    border-radius: 8px;
-    border: 1px solid #dee2e6;
-  }
-
-  .card {
-    border: none;
-    border-radius: 12px;
-    box-shadow: 0 2px 8px rgba(0,0,0,0.08);
-    overflow: hidden;
-  }
-
-  table thead {
-    background: #002e72;
-    color: #fff;
-    font-size: 0.9rem;
-  }
-
-  table tbody tr:hover {
-    background-color: #f6f9ff;
-    transition: 0.2s ease;
-  }
-
-  .badge {
-    font-size: 0.8rem;
-    border-radius: 6px;
-  }
-
-  .btn-outline-primary {
-    border-radius: 6px;
-    transition: all 0.2s ease;
-  }
-
-  .btn-outline-primary:hover {
-    background-color: #002e72;
-    color: #fff;
-    transform: translateY(-2px);
-  }
-
-  /* ===== Modal Styling ===== */
-  .modal-content {
-    border: none;
-    border-radius: 12px;
-    box-shadow: 0 5px 25px rgba(0,0,0,0.15);
-  }
-
-  .modal-header {
-    background: #002e72;
-    color: white;
-    border-bottom: none;
-    border-top-left-radius: 12px;
-    border-top-right-radius: 12px;
-  }
-
-  .modal-header .btn-close {
-    filter: invert(1);
-    opacity: 0.8;
-  }
-
-  .modal-header .btn-close:hover {
-    opacity: 1;
-  }
-
-  .modal-body {
-    background: #ffffff;
-    padding: 1.5rem;
-  }
-
-  .modal-footer {
-    background: #f8f9fb;
-    border-top: 1px solid #e5e7eb;
-    border-bottom-left-radius: 12px;
-    border-bottom-right-radius: 12px;
-  }
-
-  .details-grid {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 16px 24px;
-  }
-
-  .detail-item label {
-    font-size: 0.8rem;
-    color: #6b7280;
-    text-transform: uppercase;
-    font-weight: 600;
-    margin-bottom: 4px;
-  }
-
-  .detail-item span,
-  .detail-item p {
-    font-size: 0.95rem;
-    color: #111827;
-    line-height: 1.5;
-  }
-
-  .description-box {
-    grid-column: span 2;
-  }
-
-  .description-box p {
-    background: #f9fafb;
-    padding: 10px 12px;
-    border-radius: 6px;
-    border: 1px solid #e5e7eb;
-    white-space: pre-line;
-  }
-
-  .approve-btn {
-    background: #22c55e;
-    color: #fff;
-    border: none;
-    padding: 10px 20px;
-    border-radius: 8px;
-    font-size: 0.95rem;
-    font-weight: 500;
-    transition: 0.2s ease;
-  }
-
-  .approve-btn:hover {
-    background: #16a34a;
-    transform: translateY(-1px);
-  }
-
-  @media (max-width: 768px) {
-    .details-grid {
-      grid-template-columns: 1fr;
-    }
-  }
-</style>
 
 <!-- ======= PAGE HEADER ======= -->
-<div class="header d-flex flex-wrap align-items-center justify-content-between mb-4">
-  <h1 class="page-title mb-2 mb-md-0">Work Accomplishment Report</h1>
+{% block page_header %}
+<h1 class="page-title mb-0">Work Accomplishment Report</h1>
+{% endblock %}
 
-  <form method="get" class="d-flex gap-2 align-items-center filter-form">
-    <input 
-      type="text" 
-      name="user_status" 
-      class="form-control form-control-sm" 
-      placeholder="Search reports..." 
-      value="{{ request.GET.user_status }}">
-    <select name="unit" class="form-select form-select-sm" onchange="this.form.submit()">
-      <option value="">All Units</option>
-      <option value="repair and maintenance" {% if request.GET.unit == 'repair and maintenance' %}selected{% endif %}>Repair and Maintenance</option>
-      <option value="utility" {% if request.GET.unit == 'utility' %}selected{% endif %}>Utility</option>
-      <option value="electrical" {% if request.GET.unit == 'electrical' %}selected{% endif %}>Electrical</option>
-      <option value="motorpool" {% if request.GET.unit == 'motorpool' %}selected{% endif %}>Motorpool</option>
-    </select>
-  </form>
+{% block page_filter %}
+<form method="get" class="d-flex gap-2 align-items-center filter-form">
+  <input 
+    type="text" 
+    name="user_status" 
+    class="form-control form-control-sm" 
+    placeholder="Search reports..." 
+    value="{{ request.GET.user_status }}">
+  <select name="unit" class="form-select form-select-sm" onchange="this.form.submit()">
+    <option value="">All Units</option>
+    <option value="repair and maintenance" {% if request.GET.unit == 'repair and maintenance' %}selected{% endif %}>Repair and Maintenance</option>
+    <option value="utility" {% if request.GET.unit == 'utility' %}selected{% endif %}>Utility</option>
+    <option value="electrical" {% if request.GET.unit == 'electrical' %}selected{% endif %}>Electrical</option>
+    <option value="motorpool" {% if request.GET.unit == 'motorpool' %}selected{% endif %}>Motorpool</option>
+  </select>
+</form>
 
-  <button type="button" class="btn btn-primary d-flex align-items-center" data-bs-toggle="modal" data-bs-target="#ipmtModal">
-    <i class="bi bi-file-earmark-bar-graph me-2"></i> Generate IPMT
-  </button>
-</div>
+<button type="button" class="btn btn-primary d-flex align-items-center" data-bs-toggle="modal" data-bs-target="#ipmtModal">
+  <i class="bi bi-file-earmark-bar-graph me-2"></i> Generate IPMT
+</button>
+{% endblock %}
 
+
+
+
+{% block main_content %}
 <!-- ======= IPMT MODAL ======= -->
 <div class="modal fade" id="ipmtModal" tabindex="-1" aria-labelledby="ipmtModalLabel" aria-hidden="true">
   <div class="modal-dialog modal-lg modal-dialog-centered">
@@ -215,69 +77,70 @@
   </div>
 </div>
 
+
+
+
 <!-- ======= REPORTS TABLE ======= -->
-<div class="table-container mt-3">
-  <div class="table-responsive">
-    <table class="table align-middle">
-      <thead>
+<div class="table-responsive">
+  <table class="table align-middle table-hover request-table">
+    <thead class="table-light">
+      <tr>
+        <th>Date</th>
+        <th>Unit</th>
+        <th>Description</th>
+        <th>Requesting Office</th>
+        <th>Personnel</th>
+        <th>Status</th>
+        <th>Rating</th>
+        <th>Success Indicator</th> <!-- New column -->
+        <th>Source</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% if reports %}
+        {% for report in reports %}
         <tr>
-          <th>Date</th>
-          <th>Unit</th>
-          <th>Description</th>
-          <th>Requesting Office</th>
-          <th>Personnel</th>
-          <th>Status</th>
-          <th>Rating</th>
-          <th>Success Indicator</th> <!-- New column -->
-          <th>Source</th>
-        </tr>
-      </thead>
-      <tbody>
-        {% if reports %}
-          {% for report in reports %}
-          <tr>
-            <td>{{ report.date|date:"Y-m-d" }}</td>
-            <td><span class="fw-semibold">{{ report.unit|title }}</span></td>
-            <td>
-              <span class="war-desc" id="war-description-{{ report.id }}" data-id="{{ report.id }}" data-type="{{ report.type }}">
-                {% if report.type == "WorkAccomplishmentReport" %}
-                  <span class="spinner-border spinner-border-sm text-primary" role="status"></span>
-                  Generating AI description...
-                {% else %}
-                  {{ report.display_description|default:"(No description)" }}
-                {% endif %}
-              </span>
-            </td>
-            <td>{{ report.requesting_office }}</td>
-            <td>
-              {% for p in report.personnel %}
-                <span class="badge bg-light text-dark border me-1">{{ p }}</span>
-              {% endfor %}
-            </td>
-            <td><span class="badge bg-info text-dark">{{ report.status|default:"Completed" }}</span></td>
-            <td>{{ report.rating|default:"Not Rated" }}</td>
-            <td>
+          <td>{{ report.date|date:"Y-m-d" }}</td>
+          <td><span class="fw-semibold">{{ report.unit|title }}</span></td>
+          <td>
+            <span class="war-desc" id="war-description-{{ report.id }}" data-id="{{ report.id }}" data-type="{{ report.type }}">
               {% if report.type == "WorkAccomplishmentReport" %}
-                {{ report.success_indicator.code|default:"Pending" }}
+                <span class="spinner-border spinner-border-sm text-primary" role="status"></span>
+                Generating AI description...
               {% else %}
-                -
+                {{ report.display_description|default:"(No description)" }}
               {% endif %}
-            </td>
-            <td>
-              {% if report.request %}
-                <span class="badge bg-success">Live</span>
-              {% else %}
-                <span class="badge bg-secondary">Migrated</span>
-              {% endif %}
-            </td>
-          </tr>
-          {% endfor %}
-        {% else %}
-          <tr><td colspan="9" class="text-center text-muted py-4">No reports available.</td></tr>
-        {% endif %}
-      </tbody>
-    </table>
-  </div>
+            </span>
+          </td>
+          <td>{{ report.requesting_office }}</td>
+          <td>
+            {% for p in report.personnel %}
+              <span class="badge bg-light text-dark border me-1">{{ p }}</span>
+            {% endfor %}
+          </td>
+          <td><span class="badge bg-info text-dark">{{ report.status|default:"Completed" }}</span></td>
+          <td>{{ report.rating|default:"Not Rated" }}</td>
+          <td>
+            {% if report.type == "WorkAccomplishmentReport" %}
+              {{ report.success_indicator.code|default:"Pending" }}
+            {% else %}
+              -
+            {% endif %}
+          </td>
+          <td>
+            {% if report.request %}
+              <span class="badge bg-success">Live</span>
+            {% else %}
+              <span class="badge bg-secondary">Migrated</span>
+            {% endif %}
+          </td>
+        </tr>
+        {% endfor %}
+      {% else %}
+        <tr><td colspan="9" class="text-center text-muted py-4">No reports available.</td></tr>
+      {% endif %}
+    </tbody>
+  </table>
 </div>
 
 
@@ -346,3 +209,18 @@ document.addEventListener('DOMContentLoaded', () => {
 });
 </script>
 {% endblock %}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

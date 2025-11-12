@@ -1,172 +1,119 @@
 {% extends "gso_office/gso_base_dashboard.html" %}
-
 {% block title %}Request Management{% endblock %}
 
-{% block main_content %}
+
 <!-- ===== HEADER ===== -->
-<div class="header d-flex flex-wrap align-items-center justify-content-between mb-4">
-  <h1 class="page-title mb-2 mb-md-0" style="font-weight: 700; color: #f8f9fb;">REQUEST MANAGEMENT</h1>
+{% block page_header %}
+<h1 class="page-title mb-0">Request Management</h1>
+{% endblock %}
 
-  <form method="get" class="d-flex gap-2 align-items-center">
-    <select name="unit" class="form-select form-select-sm shadow-sm border-0" onchange="this.form.submit()">
-      <option value="">All Units</option>
-      {% for unit in units %}
-        <option value="{{ unit.id }}" {% if unit_filter|stringformat:"s" == unit.id|stringformat:"s" %}selected{% endif %}>
-          {{ unit.name|title }}
-        </option>
+{% block page_filter %}
+<!-- Unit filter -->
+<form method="get" class="d-flex gap-2 align-items-center flex-wrap">
+  <select name="unit" class="form-select form-select-sm" onchange="this.form.submit()">
+    <option value="">All Units</option>
+    {% for unit in units %}
+      <option value="{{ unit.id }}" {% if unit_filter|stringformat:"s" == unit.id|stringformat:"s" %}selected{% endif %}>
+        {{ unit.name|title }}
+      </option>
+    {% endfor %}
+  </select>
+</form>
+{% endblock %}
+
+
+
+{% block main_content %}
+<!-- ===== REQUEST TABLE ===== -->
+<div class="table-responsive">
+  <table class="table align-middle table-hover request-table">
+    <thead class="table-light">
+      <tr>
+        <th>ID</th>
+        <th>Date</th>
+        <th>Requestor</th>
+        <th>Department</th>
+        <th>Unit</th>
+        <th>Personnel</th>
+        <th>Status</th>
+        <th class="text-center">Action</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for req in requests %}
+      <tr class="request-row">
+        <td>#{{ req.id }}</td>
+        <td>{{ req.created_at|date:"M d, Y" }}</td>
+        <td>{{ req.custom_full_name|default:req.requestor.username }}</td>
+        <td class="fw-semibold text-dark">{{ req.requestor.department }}</td>
+        <td>{{ req.unit.name }}</td>
+        <td>{{ req.assigned_personnel_names|default:"— Unassigned —" }}</td>
+        <td>
+          <span class="status-badge {% if req.status == 'Pending' %}pending
+                                    {% elif req.status == 'Approved' %}approved
+                                    {% elif req.status == 'In Progress' %}in-progress
+                                    {% elif req.status == 'Done for Review' %}review
+                                    {% elif req.status == 'Completed' %}completed
+                                    {% elif req.status == 'Cancelled' %}cancelled
+                                    {% endif %}">
+            {{ req.status }}
+          </span>
+        </td>
+        <td class="text-center">
+          <button class="btn btn-outline-primary btn-sm"
+            onclick="openModal(
+              '{{ req.id }}',
+              '{{ req.created_at|date:"M d, Y" }}',
+              '{{ req.custom_full_name|default:req.requestor.username|escapejs }}',
+              '{{ req.requestor.department|escapejs }}',
+              '{{ req.unit.name|escapejs }}',
+              `{{ req.description|escapejs }}`,
+              '{{ req.status|escapejs }}',
+              `{{ req.assigned_personnel_names|escapejs }}`,
+              `{% for rm in req.requestmaterial_set.all %}{{ rm.material.name|escapejs }} ({{ rm.quantity }} {{ rm.material.unit|escapejs }}){% if not forloop.last %}, {% endif %}{% endfor %}`,
+              `{% for r in req.reports.all %}<strong>{{ r.personnel.get_full_name|escapejs }}</strong> ({{ r.created_at|date:"M d, Y H:i" }}): {{ r.report_text|escapejs }}<br>{% endfor %}`
+            )">
+            <i class="bi bi-eye"></i> View
+          </button>
+        </td>
+      </tr>
+      {% empty %}
+      <tr>
+        <td colspan="8" class="text-center text-muted py-4">
+          <i class="bi bi-inbox"></i> No requests found.
+        </td>
+      </tr>
       {% endfor %}
-    </select>
-  </form>
+    </tbody>
+  </table>
 </div>
 
-<!-- ===== REQUEST TABLE (Desktop) ===== -->
-<div class="card desktop-view">
-  <div class="table-responsive">
-    <table class="table table-hover align-middle mb-0">
-      <thead>
-        <tr>
-          <th class="ps-3 fw-bold">Request I</th>
-          <th class="fw-bold">Date</th>
-          <th class="fw-bold">Requesting Office</th>
-          <th class="fw-bold">Unit</th>
-          <th class="fw-bold">Assigned Personnel</th>
-          <th class="fw-bold">Status</th>
-          <th class="text-center fw-bold">Actions</th>
-        </tr>
-      </thead>
-      <tbody>
-        {% for req in requests %}
-        <tr>
-          <td class="ps-3 fw-medium text-muted">#{{ req.id }}</td>
-          <td>{{ req.created_at|date:"Y-m-d" }}</td>
-          <td class="fw-semibold">{{ req.requestor.department }}</td>
-          <td>{{ req.unit.name }}</td>
-          <td>{{ req.assigned_personnel_names|default:"— Unassigned —" }}</td>
-          <td>
-            {% if req.status == "Pending" %}
-              <span class="badge bg-warning text-dark">Pending</span>
-            {% elif req.status == "Approved" %}
-              <span class="badge bg-info text-dark">Approved</span>
-            {% elif req.status == "In Progress" %}
-              <span class="badge bg-primary">In Progress</span>
-            {% elif req.status == "Done for Review" %}
-              <span class="badge bg-secondary">Done for Review</span>
-            {% elif req.status == "Completed" %}
-              <span class="badge bg-success">Completed</span>
-            {% elif req.status == "Cancelled" %}
-              <span class="badge bg-danger">Cancelled</span>
-            {% else %}
-              <span class="badge bg-light text-dark">{{ req.status }}</span>
-            {% endif %}
-          </td>
-          <td class="text-center">
-            <button class="btn btn-sm btn-outline-primary px-2"
-              onclick="openModal(
-                '{{ req.id }}',
-                '{{ req.created_at|date:"Y-m-d" }}',
-                '{{ req.custom_full_name|default:req.requestor.username|escapejs }}',
-                '{{ req.requestor.department|escapejs }}',
-                '{{ req.unit.name|escapejs }}',
-                `{{ req.description|escapejs }}`,
-                '{{ req.status|escapejs }}',
-                `{{ req.assigned_personnel_names|escapejs }}`,
-                `{% for rm in req.requestmaterial_set.all %}{{ rm.material.name|escapejs }} ({{ rm.quantity }} {{ rm.material.unit|escapejs }}){% if not forloop.last %}, {% endif %}{% endfor %}`,
-                `{% for r in req.reports.all %}<strong>{{ r.personnel.get_full_name|escapejs }}</strong> ({{ r.created_at|date:"Y-m-d H:i" }}): {{ r.report_text|escapejs }}<br>{% endfor %}`
-              )">
-              <i class="bi bi-eye"></i> View
-            </button>
-          </td>
-        </tr>
-        {% empty %}
-        <tr>
-          <td colspan="7" class="text-center text-muted py-4">
-            <i class="bi bi-inbox"></i> No requests found.
-          </td>
-        </tr>
-        {% endfor %}
-      </tbody>
-    </table>
-  </div>
-</div>
-
-<!-- ===== CARD VIEW (Mobile) ===== -->
-<div class="mobile-view d-none">
-  {% for req in requests %}
-  <div class="card mb-3 shadow-sm border-0">
-    <div class="card-body">
-      <div class="d-flex justify-content-between align-items-center mb-2">
-        <h6 class="fw-bold mb-0 text-primary">#{{ req.id }}</h6>
-        {% if req.status == "Pending" %}
-          <span class="badge bg-warning text-dark">Pending</span>
-        {% elif req.status == "Approved" %}
-          <span class="badge bg-info text-dark">Approved</span>
-        {% elif req.status == "In Progress" %}
-          <span class="badge bg-primary">In Progress</span>
-        {% elif req.status == "Done for Review" %}
-          <span class="badge bg-secondary">Done for Review</span>
-        {% elif req.status == "Completed" %}
-          <span class="badge bg-success">Completed</span>
-        {% elif req.status == "Cancelled" %}
-          <span class="badge bg-danger">Cancelled</span>
-        {% endif %}
-      </div>
-      <p class="mb-1"><strong>Date:</strong> {{ req.created_at|date:"Y-m-d" }}</p>
-      <p class="mb-1"><strong>Office:</strong> {{ req.requestor.department }}</p>
-      <p class="mb-1"><strong>Unit:</strong> {{ req.unit.name }}</p>
-      <p class="mb-1"><strong>Personnel:</strong> {{ req.assigned_personnel_names|default:"— Unassigned —" }}</p>
-      <button class="btn btn-sm btn-outline-primary w-100 mt-2"
-        onclick="openModal(
-          '{{ req.id }}',
-          '{{ req.created_at|date:"Y-m-d" }}',
-          '{{ req.custom_full_name|default:req.requestor.username|escapejs }}',
-          '{{ req.requestor.department|escapejs }}',
-          '{{ req.unit.name|escapejs }}',
-          `{{ req.description|escapejs }}`,
-          '{{ req.status|escapejs }}',
-          `{{ req.assigned_personnel_names|escapejs }}`,
-          `{% for rm in req.requestmaterial_set.all %}{{ rm.material.name|escapejs }} ({{ rm.quantity }} {{ rm.material.unit|escapejs }}){% if not forloop.last %}, {% endif %}{% endfor %}`,
-          `{% for r in req.reports.all %}<strong>{{ r.personnel.get_full_name|escapejs }}</strong> ({{ r.created_at|date:"Y-m-d H:i" }}): {{ r.report_text|escapejs }}<br>{% endfor %}`
-        )">
-        <i class="bi bi-eye"></i> View Details
-      </button>
-    </div>
-  </div>
-  {% empty %}
-  <p class="text-center text-muted mt-4">
-    <i class="bi bi-inbox"></i> No requests found.
-  </p>
-  {% endfor %}
-</div>
-
-<!-- ===== MODAL (same as before) ===== -->
+<!-- ===== MODAL ===== -->
 <div class="modal fade" id="requestModal" tabindex="-1" aria-hidden="true">
   <div class="modal-dialog modal-lg modal-dialog-centered modal-dialog-scrollable">
-    <div class="modal-content">
-      <div class="modal-header">
-        <h5 class="modal-title fw-semibold">
-          <i class="bi bi-file-earmark-text me-1"></i> Request Details
-        </h5>
-        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+    <div class="modal-content rounded-4 shadow">
+      <div class="modal-header bg-gradient-primary text-white">
+        <h5 class="modal-title fw-bold"><i class="bi bi-file-earmark-text me-1"></i> Request Details</h5>
+        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
       </div>
-
       <div class="modal-body">
         <div class="details-grid">
-          <div class="detail-item"><label>Date:</label> <span id="modal-date"></span></div>
-          <div class="detail-item"><label>Requesting Office:</label> <span id="modal-office"></span></div>
-          <div class="detail-item"><label>Requestor Name:</label> <span id="modal-requestor"></span></div>
-          <div class="detail-item"><label>Unit:</label> <span id="modal-unit"></span></div>
-          <div class="detail-item description-box"><label>Description:</label> <p id="modal-description"></p></div>
-          <div class="detail-item"><label>Assigned Personnel:</label> <span id="modal-personnel"></span></div>
-          <div class="detail-item description-box"><label>Materials:</label> <p id="modal-materials"></p></div>
-          <div class="detail-item"><label>Status:</label> <span id="modal-status"></span></div>
-          <div class="detail-item description-box"><label>Personnel Reports:</label> <div id="modal-reports"></div></div>
+          <div><strong>Date:</strong> <span id="modal-date"></span></div>
+          <div><strong>Requestor:</strong> <span id="modal-requestor"></span></div>
+          <div><strong>Office:</strong> <span id="modal-office"></span></div>
+          <div><strong>Unit:</strong> <span id="modal-unit"></span></div>
+          <div class="description-box"><strong>Description:</strong> <p id="modal-description"></p></div>
+          <div><strong>Personnel:</strong> <span id="modal-personnel"></span></div>
+          <div class="description-box"><strong>Materials:</strong> <p id="modal-materials"></p></div>
+          <div><strong>Status:</strong> <span id="modal-status"></span></div>
+          <div class="description-box"><strong>Reports:</strong> <div id="modal-reports"></div></div>
         </div>
       </div>
-
     </div>
   </div>
 </div>
 
+<!-- ===== SCRIPT ===== -->
 <script>
 function openModal(id, date, requestor, office, unit, description, status, personnel, materials, reports) {
   document.getElementById("modal-date").textContent = date;
@@ -178,16 +125,94 @@ function openModal(id, date, requestor, office, unit, description, status, perso
   document.getElementById("modal-personnel").textContent = personnel || "Unassigned";
   document.getElementById("modal-materials").textContent = materials || "No materials assigned";
   document.getElementById("modal-reports").innerHTML = reports || "No reports submitted";
-
   new bootstrap.Modal(document.getElementById("requestModal")).show();
 }
 </script>
 
+<!-- ===== STYLES ===== -->
 <style>
-/* ===== Responsive View Switch ===== */
+/* Desktop Table */
+.request-table th {
+  font-weight: 700;
+  color: #1e2a38;
+  white-space: nowrap;
+}
+
+.status-badge {
+  padding: 0.25rem 0.7rem;
+  border-radius: 50px;
+  font-size: 0.8rem;
+  font-weight: 600;
+}
+.pending { background: #facc15; color: #000; }
+.approved { background: #3b82f6; color: #fff; }
+.in-progress { background: #6366f1; color: #fff; }
+.review { background: #9ca3af; color: #fff; }
+.completed { background: #16a34a; color: #fff; }
+.cancelled { background: #dc2626; color: #fff; }
+
+/* ===== MOBILE CARD VIEW ===== */
 @media (max-width: 768px) {
-  .desktop-view { display: none !important; }
-  .mobile-view { display: block !important; }
+  .table-responsive {
+    border: none;
+  }
+  .request-table {
+    display: block;
+  }
+  .request-table thead {
+    display: none;
+  }
+  .request-table tbody {
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+  }
+  .request-table tr {
+    display: flex;
+    flex-direction: column;
+    background: #fff;
+    border-radius: 1rem;
+    box-shadow: 0 0.5rem 1rem rgba(0,0,0,0.05);
+    padding: 1rem;
+  }
+  .request-table td {
+    display: block;
+    padding: 0.25rem 0;
+    border: none;
+  }
+
+  /* Card Layout */
+  .request-table td:nth-child(1) {
+    font-weight: 700;
+    font-size: 1rem;
+    color: #1e2a38;
+  }
+  .request-table td:nth-child(2),
+  .request-table td:nth-child(3),
+  .request-table td:nth-child(4),
+  .request-table td:nth-child(5) {
+    font-size: 0.9rem;
+    color: #4b5563;
+  }
+  .request-table td:nth-child(6) {
+    font-size: 0.9rem;
+    margin-top: 0.5rem;
+  }
+  .request-table td:nth-child(7),
+  .request-table td:nth-child(8) {
+    margin-top: 0.8rem;
+  }
+  .request-table td:nth-child(7) {
+    display: flex;
+    justify-content: flex-start;
+  }
+  .request-table td:nth-child(8) {
+    text-align: center;
+  }
+  .btn-outline-primary {
+    width: 100%;
+    border-radius: 50px;
+  }
 }
 </style>
 
