@@ -3,7 +3,6 @@
 
 {% block title %}Edit User{% endblock %}
 
-
 {% block page_header %}
 <h1 class="page-title mb-0">
   <i></i>Edit User —
@@ -14,8 +13,6 @@
   {% endif %}
 </h1>
 {% endblock %}
-
-
 
 {% block main_content %}
 <div class="container mt-4 mb-5">
@@ -63,6 +60,18 @@
             {{ form.department|add_class:"form-select shadow-sm" }}
           </div>
 
+          <!-- Position -->
+          <div class="col-md-6" id="positionField">
+            <label for="id_position" class="form-label fw-semibold text-uppercase text-primary small">Position</label>
+            {{ form.position|add_class:"form-select shadow-sm" }}
+          </div>
+
+          <!-- Employment Status -->
+          <div class="col-md-6" id="employmentStatusField">
+            <label for="id_employment_status" class="form-label fw-semibold text-uppercase text-primary small">Employment Status</label>
+            {{ form.employment_status|add_class:"form-select shadow-sm" }}
+          </div>
+
           <!-- Status -->
           <div class="col-md-6">
             <label for="id_account_status" class="form-label fw-semibold text-uppercase text-primary small">Status</label>
@@ -93,6 +102,8 @@ document.addEventListener("DOMContentLoaded", function() {
   const lastName = document.getElementById("lastNameField");
   const unitField = document.getElementById("unitField");
   const deptField = document.getElementById("deptField");
+  const positionField = document.getElementById("positionField");
+  const employmentStatusField = document.getElementById("employmentStatusField");
 
   function toggleFields() {
     if (!roleField) return;
@@ -102,11 +113,15 @@ document.addEventListener("DOMContentLoaded", function() {
     lastName.style.display = "block";
     unitField.style.display = "block";
     deptField.style.display = "block";
+    positionField.style.display = "block";
+    employmentStatusField.style.display = "block";
 
     if (roleField.value === "requestor") {
       firstName.style.display = "none";
       lastName.style.display = "none";
       unitField.style.display = "none";
+      positionField.style.display = "none";
+      employmentStatusField.style.display = "none";
     } 
     else if (roleField.value === "gso" || roleField.value === "director") {
       unitField.style.display = "none";

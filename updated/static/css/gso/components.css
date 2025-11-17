@@ -1,0 +1,150 @@
+/* ===== Buttons ===== */
+.action-btn {
+  background: none;
+  border: none;
+  color: #1e40af;
+  cursor: pointer;
+  font-size: 14px;
+  text-decoration: underline;
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.action-btn:hover {
+  color: #1e3a8a;
+  transform: translateY(-3px);
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+}
+
+button,
+.btn-outline-primary {
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+button:hover,
+.btn-outline-primary:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+}
+
+.btn-outline-primary {
+  border-radius: 6px;
+}
+.btn-outline-primary:hover {
+  background-color: #002e72;
+  color: #fff;
+}
+
+/* ===== Cards ===== */
+.card {
+  border: none;
+  border-radius: 12px;
+  box-shadow: 0 2px 6px rgba(0,0,0,0.1);
+  overflow: hidden;
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.card:hover {
+  transform: translateY(-5px) scale(1);
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.2);
+}
+
+/* ===== Modal (Modernized) ===== */
+.modal-content {
+  border: none;
+  border-radius: 5px;
+  box-shadow: 0 10px 35px rgba(0, 0, 0, 0.25);
+  overflow: hidden;
+}
+
+.modal-header {
+  background: #002255;
+  color: white;
+  border-bottom: none;
+  border-top-left-radius: 5px;
+  border-top-right-radius: 5px;
+  padding: 1rem 1.5rem;
+}
+
+.modal-header .btn-close {
+  filter: invert(1);
+  opacity: 0.8;
+}
+
+.modal-header .btn-close:hover {
+  opacity: 1;
+}
+
+.modal-body {
+  background: #ffffff;
+  padding: 1.5rem;
+}
+
+.modal-footer {
+  background: #f8f9fb;
+  border-top: 1px solid #e5e7eb;
+  border-bottom-left-radius: 16px;
+  border-bottom-right-radius: 16px;
+  padding: 1rem 1.5rem;
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.5rem;
+}
+
+.modal-section {
+  margin-bottom: 20px;
+}
+
+.section-title {
+  font-weight: 600;
+  margin-bottom: 8px;
+  color: #1e3a8a;
+}
+
+.info-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px 20px;
+}
+
+.info-grid label {
+  font-weight: 500;
+  color: #555;
+  display: block;
+}
+
+.info-grid span {
+  font-weight: 600;
+}
+
+.boxed-text {
+  background: #f8f9fa;
+  padding: 10px 12px;
+  border-radius: 8px;
+  border: 1px solid #e5e7eb;
+  font-size: 0.95rem;
+  color: #444;
+}
+
+.status-pill {
+  padding: 6px 12px;
+  border-radius: 50px;
+  font-weight: 600;
+  background: #e0e7ff;
+  color: #1e40af;
+  font-size: 0.85rem;
+}
+
+.approve-btn {
+  background: #086100;
+  color: white;
+  padding: 8px 18px;
+  border-radius: 6px;
+  border: none;
+  transition: 0.2s ease, transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.approve-btn:hover {
+  background: #064d00;
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+}

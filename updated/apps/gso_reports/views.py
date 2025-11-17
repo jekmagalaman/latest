@@ -17,6 +17,7 @@ from apps.gso_accounts.models import User, Unit
 from .models import WorkAccomplishmentReport, SuccessIndicator, IPMT
 from .utils import normalize_report
 from apps.ai_service.utils import generate_war_description
+from apps.ai_service.utils import generate_ipmt_summary_sync
 
 
 # -------------------------------
@@ -199,9 +200,34 @@ def generate_ipmt(request):
 
     start_row = 13
     for i, r in enumerate(reports, start=start_row):
-        ws.cell(row=i, column=1).value = r.get("indicator", "")
-        ws.cell(row=i, column=2).value = r.get("description", "")
-        ws.cell(row=i, column=3).value = r.get("remarks", "")
+
+        # --- CLEAN INDICATOR STRING ---
+        indicator_raw = r.get("indicator", "")
+
+        # Remove ANY line breaks, tabs, multiple spaces
+        indicator_raw = " ".join(indicator_raw.split())
+
+        # If it has " - ", clean parts separately
+        if " - " in indicator_raw:
+            code, desc = indicator_raw.split(" - ", 1)
+            code = code.strip()
+            desc = " ".join(desc.split())  # remove all extra spaces/newlines
+            indicator_clean = f"{code} - {desc}"
+        else:
+            indicator_clean = indicator_raw.strip()
+
+        # CLEAN description
+        desc_clean = r.get("description", "") or ""
+        desc_clean = " ".join(desc_clean.split())
+
+        # CLEAN remarks
+        remarks_clean = r.get("remarks", "") or ""
+        remarks_clean = " ".join(remarks_clean.split())
+
+        # Write to Excel
+        ws.cell(row=i, column=1).value = indicator_clean
+        ws.cell(row=i, column=2).value = desc_clean
+        ws.cell(row=i, column=3).value = remarks_clean
 
     response = HttpResponse(content_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
     filename = f"IPMT_{unit_filter}_{month_filter}.xlsx"
@@ -245,14 +271,16 @@ def get_war_description(request, war_id):
     
 
 # -------------------------------
-# Preview IPMT (Web)
+# Preview IPMT (Web) with AI Summarization
 # -------------------------------
+
 @login_required
 @user_passes_test(is_gso_or_director)
 def preview_ipmt(request):
     """
     Preview IPMT rows for the selected unit, personnel, and month.
     Fetches WARs linked to each SuccessIndicator and assigned personnel.
+    AI summarizes multiple WARs per Success Indicator into one concise description.
     """
     month_filter = request.GET.get("month")
     unit_filter = request.GET.get("unit")
@@ -290,14 +318,33 @@ def preview_ipmt(request):
                 date_started__month=month_num
             )
 
-            # Combine descriptions from all WARs
-            description = " ".join([w.description for w in wars if w.description]) or ""
+            war_ids = [w.id for w in wars]
+
+            # --- AI summarization per Success Indicator ---
+            ipmt_obj = IPMT.objects.filter(
+                personnel=user,
+                unit=unit,
+                month=month_filter,
+                indicator=indicator
+            ).first()
+
+            if ipmt_obj and ipmt_obj.accomplishment:
+                # Use saved summary
+                summary_text = ipmt_obj.accomplishment
+            else:
+                # First-time AI generation
+                if war_ids:
+                    summary_dict = generate_ipmt_summary_sync(war_ids)
+                    summary_text = summary_dict.get(indicator.code, "")
+                else:
+                    summary_text = ""
 
             reports.append({
                 "indicator": indicator.code,
-                "description": description,
-                "remarks": "COMPLIED" if description else "",
-                "war_ids": [w.id for w in wars],
+                "indicator_description": indicator.description,
+                "description": summary_text,  # AI summarized description
+                "remarks": "COMPLIED" if summary_text else "",
+                "war_ids": war_ids,
             })
 
     context = {
@@ -309,12 +356,18 @@ def preview_ipmt(request):
 
     return render(request, "gso_office/ipmt/ipmt_preview.html", context)
 
+
+
 # -------------------------------
-# Save IPMT
+# Save IPMT (Web)
 # -------------------------------
 @login_required
 @user_passes_test(is_gso_or_director)
 def save_ipmt(request):
+    """
+    Save or update IPMT rows after preview.
+    Handles edited descriptions and remarks, links WARs to each row.
+    """
     if request.method != "POST":
         return JsonResponse({"error": "POST required"}, status=400)
 
@@ -341,34 +394,32 @@ def save_ipmt(request):
             if not indicator_code:
                 continue
 
-            indicator = SuccessIndicator.objects.filter(unit=unit, code__iexact=indicator_code).first()
-            if not indicator:
-                # Create missing indicator automatically
-                indicator = SuccessIndicator.objects.create(
+            # Ensure SuccessIndicator exists
+            si = SuccessIndicator.objects.filter(unit=unit, code__iexact=indicator_code).first()
+            if not si:
+                si = SuccessIndicator.objects.create(
                     unit=unit,
                     code=indicator_code,
                     description=row.get("description", ""),
                     is_active=True
                 )
 
-            # WARs linked to this indicator
+            # Get WARs linked to this row
             war_ids = row.get("war_ids", [])
-            wars = WorkAccomplishmentReport.objects.filter(
-                assigned_personnel=user,
-                unit=unit
-            )
+            wars = WorkAccomplishmentReport.objects.filter(assigned_personnel=user, unit=unit)
             if war_ids:
                 wars = wars.filter(id__in=war_ids)
 
+            # Take description and remarks from frontend
             accomplishment = row.get("description", "").strip()
             remarks = row.get("remarks", "").strip() or accomplishment
 
-            # Save or update IPMT
+            # Save or update IPMT object
             ipmt_obj, _ = IPMT.objects.update_or_create(
                 personnel=user,
                 unit=unit,
                 month=month,
-                indicator=indicator,
+                indicator=si,
                 defaults={
                     "accomplishment": accomplishment,
                     "remarks": remarks
@@ -379,8 +430,6 @@ def save_ipmt(request):
             ipmt_obj.reports.set(wars)
 
     return JsonResponse({"status": "success"})
-
-
 
 # -------------------------------
 # GSO OFFICE: Edit Success Indicator in WAR
@@ -419,47 +468,6 @@ def update_war_success_indicator(request, war_id):
 
 
 
-
-
-
-
-
-
-
-# GSO Analytics View
-from django.contrib.auth.decorators import login_required
-from django.shortcuts import render
-from apps.gso_requests.models import ServiceRequest as Request
-from apps.gso_inventory.models import InventoryItem as Material
-
-@login_required
-def gso_analytics(request):
-    # ===== REQUEST ANALYTICS =====
-    total_requests = Request.objects.count()
-    completed_requests = Request.objects.filter(status='Completed').count()
-    pending_requests = Request.objects.filter(status='Pending').count()
-    in_progress_requests = Request.objects.filter(status='In Progress').count()
-
-    # ===== INVENTORY ANALYTICS =====
-    total_materials = Material.objects.count()
-    low_stock_materials = Material.objects.filter(quantity__lte=10).count()  # threshold for low stock
-    out_of_stock = Material.objects.filter(quantity=0).count()
-
-    # ===== CONTEXT =====
-    context = {
-        # Request analytics
-        'total_requests': total_requests,
-        'completed_requests': completed_requests,
-        'pending_requests': pending_requests,
-        'in_progress_requests': in_progress_requests,
-
-        # Inventory analytics
-        'total_materials': total_materials,
-        'low_stock_materials': low_stock_materials,
-        'out_of_stock': out_of_stock,
-    }
-
-    return render(request, 'gso_office/analytics/gso_analytics.html', context)
 
 
 @login_required
@@ -526,3 +534,49 @@ def feedback_reports(request):
         "gso_office/feedbacks/feedback_reports.html",
         {"feedback_list": feedback_list}
     )
+
+
+
+
+
+
+
+
+
+
+# GSO Analytics View
+from django.contrib.auth.decorators import login_required
+from django.shortcuts import render
+from apps.gso_requests.models import ServiceRequest as Request
+from apps.gso_inventory.models import InventoryItem as Material
+
+@login_required
+def gso_analytics(request):
+    # ===== REQUEST ANALYTICS =====
+    total_requests = Request.objects.count()
+    completed_requests = Request.objects.filter(status='Completed').count()
+    pending_requests = Request.objects.filter(status='Pending').count()
+    in_progress_requests = Request.objects.filter(status='In Progress').count()
+
+    # ===== INVENTORY ANALYTICS =====
+    total_materials = Material.objects.count()
+    low_stock_materials = Material.objects.filter(quantity__lte=10).count()  # threshold for low stock
+    out_of_stock = Material.objects.filter(quantity=0).count()
+
+    # ===== CONTEXT =====
+    context = {
+        # Request analytics
+        'total_requests': total_requests,
+        'completed_requests': completed_requests,
+        'pending_requests': pending_requests,
+        'in_progress_requests': in_progress_requests,
+
+        # Inventory analytics
+        'total_materials': total_materials,
+        'low_stock_materials': low_stock_materials,
+        'out_of_stock': out_of_stock,
+    }
+
+    return render(request, 'gso_office/analytics/gso_analytics.html', context)
+
+

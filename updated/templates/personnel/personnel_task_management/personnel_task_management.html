@@ -2,6 +2,8 @@
 
 {% block title %}Task Management{% endblock %}
 
+{% load static %}
+
 
 
 {% block page_header %}
@@ -37,62 +39,74 @@
 
 {% block main_content %}
 <!-- ===== REQUEST TABLE ===== -->
-<div class="table-responsive">
-  <table class="table align-middle table-hover request-table">
-    <thead class="table-light">
-      <tr>
-        <th class="ps-3 fw-bold text-secondary">Task ID</th>
-        <th class="fw-bold text-secondary">Date</th>
-        <th class="fw-bold text-secondary">Requesting Office</th>
-        <th class="fw-bold text-secondary">Unit</th>
-        <th class="fw-bold text-secondary">Assigned Personnel</th>
-        <th class="fw-bold text-secondary">Status</th>
-        <th class="text-center fw-bold text-secondary">Actions</th>
-      </tr>
-    </thead>
-    <tbody>
-      {% for task in tasks %}
+<div class="table-container">
+  <div class="table-responsive">
+    <table class="table align-middle table-hover request-table">
+      <thead class="table-light">
         <tr>
-          <td class="ps-3 fw-medium text-muted">#{{ task.id }}</td>
-          <td>{{ task.created_at|date:"Y-m-d H:i" }}</td>
-          <td class="fw-semibold">{{ task.requestor.department }}</td>
-          <td>{{ task.unit|title }}</td>
-          <td>
-            {% if task.assigned_personnel.all %}
-              {% for p in task.assigned_personnel.all %}
-                {{ p.get_full_name|default:p.username }}{% if not forloop.last %}, {% endif %}
-              {% endfor %}
-            {% else %}
-              <span class="text-muted">— Unassigned —</span>
-            {% endif %}
-          </td>
-          <td>
-            <span class="status-badge {% if task.status == 'Pending' %}pending
-                                      {% elif task.status == 'Approved' %}approved
-                                      {% elif task.status == 'In Progress' %}in-progress
-                                      {% elif task.status == 'Done for Review' %}review
-                                      {% elif task.status == 'Completed' %}completed
-                                      {% elif task.status == 'Cancelled' %}cancelled
-                                      {% endif %}">
-              {{ task.status }}
-            </span>
-          </td>
-          <td class="text-center">
-            <a href="{% url 'gso_requests:personnel_task_detail' task.id %}" 
-                class="btn btn-sm btn-outline-primary px-2">
-              <i class="bi bi-eye"></i> View
-            </a>
-          </td>
+          <th class="ps-3 fw-bold text-secondary">Task ID</th>
+          <th class="fw-bold text-secondary">Date Submitted</th>
+          <th class="fw-bold text-secondary">Requesting Office</th>
+          <th class="fw-bold text-secondary">Unit</th>
+          <th class="fw-bold text-secondary">Assigned Personnel</th>
+          <th class="text-center text-secondary">Status</th>
+          <th class="text-center fw-bold text-secondary">Actions</th>
         </tr>
-        {% empty %}
-        <tr>
-          <td colspan="7" class="text-center text-muted py-4">
-            <i class="bi bi-inbox"></i> No tasks assigned to you.
-          </td>
-        </tr>
-      {% endfor %}
-    </tbody>
-  </table>
+      </thead>
+      <tbody>
+        {% for task in tasks %}
+          <tr>
+            <td class="ps-3 fw-medium text-muted">#{{ task.id }}</td>
+            <td>{{ task.created_at|date:"Y-m-d H:i" }}</td>
+            <td class="fw-semibold">{{ task.requestor.department }}</td>
+            <td>{{ task.unit|title }}</td>
+            <td>
+              {% if task.assigned_personnel.all %}
+                {% for p in task.assigned_personnel.all %}
+                  {{ p.get_full_name|default:p.username }}{% if not forloop.last %}, {% endif %}
+                {% endfor %}
+              {% else %}
+                <span class="text-muted">— Unassigned —</span>
+              {% endif %}
+            </td>
+            <td class="text-center">
+              <span class="status-badge 
+                    {% if task.status == 'Pending' %}pending
+                    {% elif task.status == 'Approved' %}approved
+                    {% elif task.status == 'In Progress' %}in-progress
+                    {% elif task.status == 'Done for Review' %}review
+                    {% elif task.status == 'Completed' %}completed
+                    {% elif task.status == 'Cancelled' %}cancelled
+                    {% elif task.status == 'Emergency' %}emergency
+                    {% endif %}">
+                {% if task.is_emergency %}
+                  <span>
+                    <img src="{% static 'images/emergency.png' %}" 
+                        alt="Emergency" 
+                        class="status-emergency-icon">
+                  </span>
+                {% endif %}
+  
+                {{ task.status }}
+              </span>
+            </td>
+            <td class="text-center">
+              <a href="{% url 'gso_requests:personnel_task_detail' task.id %}" 
+                  class="btn btn-sm btn-outline-primary px-2">
+                <i class="bi bi-eye"></i> View
+              </a>
+            </td>
+          </tr>
+          {% empty %}
+          <tr>
+            <td colspan="7" class="text-center text-muted py-4">
+              <i class="bi bi-inbox"></i> No tasks assigned to you.
+            </td>
+          </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
 </div>
 
 {% endblock %}

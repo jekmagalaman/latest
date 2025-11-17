@@ -35,6 +35,10 @@
 {% endblock %}
  
 
+
+
+
+
 {% block main_content %}
 <div class="account-management">
 
@@ -46,6 +50,7 @@
           <th style="width: 5%;">#</th>
           <th>USER</th>
           <th>ROLE</th>
+          <th>POSITION</th>
           <th>UNIT</th>
           <th>STATUS</th>
           <th class="text-center" style="width: 10%;">ACTION</th>
@@ -70,6 +75,10 @@
 
           <!-- ROLE -->
           <td><span class="text-capitalize">{{ user.get_role_display }}</span></td>
+
+          <!-- POSITION -->
+          <td><span class="text-capitalize">{{ user.position }}</span></td>
+          
 
           <!-- UNIT -->
           <td>

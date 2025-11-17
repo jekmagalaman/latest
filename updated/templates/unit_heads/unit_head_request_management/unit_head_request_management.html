@@ -54,7 +54,7 @@
       {% for req in requests %}
         <tr>
           <td class="ps-3 fw-medium text-muted">#{{ req.id }}</td>
-          <td>{{ req.created_at|date:"M d, Y H:i" }}</td>
+          <td>{{ req.created_at|date:"M d, Y g:ia"|cut:"." }}</td>
           <td class="fw-semibold">{{ req.requestor.department }}</td>
           <td>{{ req.unit.name }}</td>
           <td>{{ req.assigned_personnel_names|default:"— Unassigned —" }}</td>

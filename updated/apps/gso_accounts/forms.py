@@ -19,6 +19,8 @@ class UserForm(forms.ModelForm):
         fields = [
             "role",
             "unit",
+            "position",
+            "employment_status",
             "username",
             "first_name",
             "last_name",
@@ -67,7 +69,18 @@ class UserEditForm(forms.ModelForm):
 
     class Meta:
         model = User
-        fields = ["username", "role", "unit", "first_name", "last_name", "email", "department", "account_status"]
+        fields = [
+            "username",
+            "role",
+            "unit",
+            "position",
+            "employment_status",
+            "first_name",
+            "last_name",
+            "email",
+            "department",
+            "account_status",
+        ]
 
     def clean(self):
         cleaned_data = super().clean()

@@ -3,13 +3,14 @@ from django.shortcuts import render, get_object_or_404, redirect
 from django.contrib.auth.decorators import login_required, user_passes_test
 from django.contrib import messages
 from django.utils import timezone
-from django.http import HttpResponseForbidden
+from django.http import HttpResponseForbidden, JsonResponse
 
 from .models import ServiceRequest, RequestMaterial, Unit, TaskReport, Feedback
 from apps.gso_accounts.models import User
 from apps.gso_inventory.models import InventoryItem
 from .utils import filter_requests, get_unit_inventory, create_war_from_request, notify_users
 from apps.gso_reports.models import WorkAccomplishmentReport, SuccessIndicator
+from django.db import transaction
 
 # -------------------------------
 # Role checks
@@ -52,12 +53,33 @@ def request_management(request):
 @user_passes_test(is_director)
 def approve_request(request, pk):
     req = get_object_or_404(ServiceRequest, pk=pk)
+
+    # Only allow approving when status is Pending
     if req.status != "Pending":
         return HttpResponseForbidden("This request cannot be approved.")
 
+    # 🔒 NEW RULE:
+    # Prevent director from approving if NO personnel is assigned
+    # Use the correct condition based on your model structure.
+
+    # If assigned_personnel is a ManyToManyField or related manager:
+    try:
+        has_assigned = req.assigned_personnel.exists()
+    except:
+        # If you're using assigned_personnel_names string/list:
+        has_assigned = bool(req.assigned_personnel_names)
+
+    if not has_assigned:
+        messages.error(request, "Cannot approve request — personnel not assigned yet.")
+        return redirect("gso_requests:request_management")
+
+    # Allowed: request has assigned personnel → approve it
     req.status = "Approved"
     req.save()
+
+    messages.success(request, "Request approved successfully.")
     return redirect("gso_requests:request_management")
+
 
 
 
@@ -208,6 +230,23 @@ def unit_head_request_detail(request, pk):
             messages.success(request, "✅ Material assignments saved successfully.")
             return redirect("gso_requests:unit_head_request_detail", pk=pk)
 
+        # === Schedule Request (NEW) ===
+        elif form_type == "schedule_request":
+            start = request.POST.get("schedule_start") or None
+            end = request.POST.get("schedule_end") or None
+            remarks = request.POST.get("schedule_remarks") or ""
+
+            # Only convert non-empty strings to datetime
+            from django.utils.dateparse import parse_datetime
+            service_request.schedule_start = parse_datetime(start) if start else None
+            service_request.schedule_end = parse_datetime(end) if end else None
+            service_request.schedule_remarks = remarks
+            service_request.save(update_fields=["schedule_start", "schedule_end", "schedule_remarks"])
+
+            messages.success(request, "✅ Schedule saved successfully!")
+            return redirect("gso_requests:unit_head_request_detail", pk=pk)
+
+
         # === Approve Completion (Generate WAR) ===
         elif action == "approve" and service_request.status == "Done for Review":
             service_request.status = "Completed"
@@ -350,10 +389,17 @@ def personnel_task_detail(request, pk):
 
     if request.method == "POST":
         # Start Task
-        if "start" in request.POST and task.status == "Approved":
-            task.status = "In Progress"
+        if "start" in request.POST and (task.status == "Approved" or task.is_emergency):
+            task.status = "In Progress"  # Workflow stays consistent
             task.started_at = timezone.now()
+
+            # Optional: Add an emergency note
+            if task.is_emergency:
+                task.emergency_started = True  # <-- if you want a separate flag
+                # Or just rely on `is_emergency` in the template
+
             task.save()
+
 
         # Mark Done
         elif "done" in request.POST and task.status == "In Progress":
@@ -455,6 +501,7 @@ def personnel_task_detail(request, pk):
 
 
 
+
 @login_required
 def personnel_history(request):
     history = ServiceRequest.objects.filter(assigned_personnel=request.user, status="Completed").order_by("-created_at")
@@ -483,18 +530,46 @@ def personnel_inventory(request):
 @login_required
 @user_passes_test(is_requestor)
 def requestor_request_management(request):
+    # 🔹 Get all requests made by this user
     requests_qs = ServiceRequest.objects.filter(requestor=request.user).order_by("-created_at")
     units = Unit.objects.all()
+
+    # ✅ Mark which requests already have feedback
+    for r in requests_qs:
+        r.has_feedback = Feedback.objects.filter(request=r, user=request.user).exists()
+
+    # ✅ SQD question labels for feedback form rendering
+    sqd_labels = [
+        "Staff were courteous and helpful",
+        "Spent reasonable time for transaction",
+        "Clear communication during process",
+        "Accessible and adequate facilities",
+        "Equipped and knowledgeable staff",
+        "Transparent and fair service",
+        "Services met expectations",
+        "Satisfied with overall experience",
+        "Would recommend the service"
+    ]
+
     return render(request, "requestor/requestor_request_management/requestor_request_management.html", {
         "requests": requests_qs,
         "units": units,
+        "sqd_labels": sqd_labels,  # ✅ added context variable
     })
+
+
+
 
 
 @login_required
 @user_passes_test(is_requestor)
 def add_request(request):
     if request.method == "POST":
+
+        labor = request.POST.get("labor") == "1"
+        materials = request.POST.get("materials") == "1"
+        others = request.POST.get("others") == "1"
+
         ServiceRequest.objects.create(
             requestor=request.user,
             unit_id=request.POST.get("unit"),
@@ -505,9 +580,20 @@ def add_request(request):
             custom_email=request.POST.get("custom_email") or "",
             custom_contact_number=request.POST.get("custom_contact_number") or "",
             attachment=request.FILES.get("attachment"),
+
+            # NEW FIELDS
+            labor=labor,
+            materials_needed=materials,
+            others_needed=others,
         )
+
         return redirect("gso_requests:requestor_request_management")
     
+
+
+
+
+
 
 
     
@@ -648,23 +734,6 @@ def submit_feedback(request):
                 setattr(feedback, f"sqd{i}", int(val) if val else None)
             feedback.save()
 
-            # 🔔 Notification: GSO, Director, and Unit Head(s)
-            # GSO & Director
-            recipients_gso_director = User.objects.filter(role__in=["gso", "director"], is_active=True)
-            notify_users(
-                recipients_gso_director,
-                message=f"📝 Feedback submitted for request #{req.id} by {user.get_full_name()}",
-                url=f"/gso_requests/{req.id}/"
-            )
-
-            # Unit Head(s) of the request's unit
-            recipients_unit_heads = User.objects.filter(role="unit_head", unit=req.unit, is_active=True)
-            notify_users(
-                recipients_unit_heads,
-                message=f"📝 Feedback submitted for request #{req.id} by {user.get_full_name()}",
-                url=f"/unit_head/request/{req.id}/"
-            )
-
             return JsonResponse({
                 "success": True,
                 "message": "Thank you for your feedback!",
@@ -674,13 +743,3 @@ def submit_feedback(request):
             return JsonResponse({"success": False, "error": str(e)})
 
     return JsonResponse({"success": False, "error": "Invalid method"})
-
-# ---- New view for modal content ----
-@login_required
-def request_detail_partial(request, pk):
-    """Returns just the modal HTML for one request (used via AJAX)"""
-    req = get_object_or_404(ServiceRequest, pk=pk)
-    return render(request, "gso_office/partials/request_modal_content.html", {
-        "req": req,
-        "user_role": request.user.role,  # <-- add this
-    })

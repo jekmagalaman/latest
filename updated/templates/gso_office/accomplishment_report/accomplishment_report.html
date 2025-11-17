@@ -2,6 +2,8 @@
 
 {% block title %}Work Accomplishment Report{% endblock %}
 
+{% load static %}
+
 
 
 <!-- ======= PAGE HEADER ======= -->
@@ -118,7 +120,33 @@
               <span class="badge bg-light text-dark border me-1">{{ p }}</span>
             {% endfor %}
           </td>
-          <td><span class="badge bg-info text-dark">{{ report.status|default:"Completed" }}</span></td>
+
+
+          <td>
+              <span class="status-badge
+                  {% if report.status == 'Pending' %} pending
+                  {% elif report.status == 'Approved' %} approved
+                  {% elif report.status == 'In Progress' %} in-progress
+                  {% elif report.status == 'Done for Review' %} done-review
+                  {% elif report.status == 'Completed' %} completed
+                  {% elif report.status == 'Cancelled' %} cancelled
+                  {% elif report.status == 'Emergency' %} emergency
+                  {% endif %}">
+
+                  {% if report.is_emergency %}
+                    <span>
+                      <img src="{% static 'images/emergency.png' %}" 
+                          alt="Emergency" 
+                          class="status-emergency-icon">
+                    </span>
+                  {% endif %}
+                  
+                  {{ report.status|default:"Completed" }}
+              </span>
+          </td>
+
+
+
           <td>{{ report.rating|default:"Not Rated" }}</td>
           <td>
             {% if report.type == "WorkAccomplishmentReport" %}

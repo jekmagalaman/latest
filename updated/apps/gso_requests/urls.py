@@ -40,7 +40,4 @@ urlpatterns = [
 
     # Feedback
     path('submit_feedback/', views.submit_feedback, name='submit_feedback'),
-
-    #Common
-    path("<int:pk>/", views.request_detail_partial, name="request_detail_partial"),  # modal content
 ]

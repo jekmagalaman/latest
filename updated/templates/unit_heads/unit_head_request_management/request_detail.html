@@ -61,7 +61,24 @@
                 {{ req.status }}
               </span>
             </p>
-
+          
+            <!-- SCHEDULE INFO -->
+            {% if req.schedule_start %}
+              <p><strong>Scheduled Start:</strong> 
+                <span class="badge bg-primary">{{ req.schedule_start|date:"Y-m-d H:i" }}</span>
+              </p>
+            {% endif %}
+            {% if req.schedule_end %}
+              <p><strong>Scheduled End:</strong> 
+                <span class="badge bg-primary">{{ req.schedule_end|date:"Y-m-d H:i" }}</span>
+              </p>
+            {% endif %}
+            {% if req.schedule_remarks %}
+              <p><strong>Schedule Remarks:</strong><br>
+                <small class="text-muted">{{ req.schedule_remarks }}</small>
+              </p>
+            {% endif %}
+          
             <p><strong>Assigned Personnel:</strong><br>
               {% if req.assigned_personnel.all %}
                 {% for p in req.assigned_personnel.all %}
@@ -73,7 +90,7 @@
                 <span class="text-muted">Unassigned</span>
               {% endif %}
             </p>
-
+          
             <p><strong>Assigned Materials:</strong></p>
             {% if req.requestmaterial_set.all %}
               <ul class="list-unstyled ps-3 mb-0">
@@ -85,6 +102,7 @@
               <p class="text-muted mb-0">No materials assigned</p>
             {% endif %}
           </div>
+          
         </div>
         
 
@@ -118,31 +136,47 @@
       </div>
     </div>
 
-    <!-- PROGRESS REPORTS -->
-    <div class="card border-0 shadow-sm flex-fill">
-      <div class="card-header text-white fw-bold" style="background-color: #002e72;">
-        <i class="bi bi-clipboard-check me-2"></i> Progress Reports
+
+
+
+    {% if req.status not in "Completed,Cancelled,Done for Review" %}
+    <!-- SCHEDULING -->
+    <form method="post" class="flex-fill">
+      {% csrf_token %}
+      <input type="hidden" name="form_type" value="schedule_request">
+
+      <div class="card shadow-sm border-0 h-100">
+        <div class="card-header text-white fw-bold" style="background-color: #002e72;">
+          <i class="bi bi-calendar-event me-2"></i> Schedule Task
+        </div>
+
+        <div class="card-body">
+          <label class="form-label fw-semibold">Start Date & Time</label>
+          <input type="datetime-local" name="schedule_start"
+                value="{{ req.schedule_start|date:'M d, Y g:ia' }}"
+                class="form-control mb-3" required>
+          <label class="form-label fw-semibold">End Date & Time (Optional)</label>
+          <input type="datetime-local" name="schedule_end"
+                value="{{ req.schedule_end|date:'Y-m-d\\TH:i' }}"
+                class="form-control mb-3">
+
+          <label class="form-label fw-semibold">Remarks (Optional)</label>
+          <textarea name="schedule_remarks" class="form-control" rows="2">{{ req.schedule_remarks }}</textarea>
+        </div>
+
+        <div class="text-end p-3">
+          <button type="submit" name="action" value="save_schedule" class="btn btn-warning px-4">
+            <i class="bi bi-save me-1"></i> Save Schedule
+          </button>
+        </div>
       </div>
-      <div class="card-body" style="max-height: 300px; overflow-y: auto;">
-        {% if reports %}
-          <div class="list-group">
-            {% for r in reports %}
-              <div class="list-group-item list-group-item-action mb-2 rounded-3 shadow-sm">
-                <div class="d-flex justify-content-between align-items-start">
-                  <div>
-                    <strong>{{ r.personnel.get_full_name|default:r.personnel.username }}</strong><br>
-                    <small>{{ r.report_text }}</small>
-                  </div>
-                  <small class="text-muted">{{ r.created_at|date:"Y-m-d H:i" }}</small>
-                </div>
-              </div>
-            {% endfor %}
-          </div>
-        {% else %}
-          <p class="text-muted mb-0">No reports yet.</p>
-        {% endif %}
-      </div>
-    </div>
+    </form>
+    {% endif %}
+
+
+
+
+
 
   </div>
 
@@ -250,6 +284,7 @@
     </form>
     {% endif %}
 
+
     <!-- SUCCESS INDICATOR -->
     <div class="card shadow-sm border-0">
       <div class="card-header text-white fw-bold" style="background-color: #002e72;">
@@ -286,6 +321,42 @@
         </form>
       </div>
     </div>
+
+
+
+
+
+    <!-- PROGRESS REPORTS -->
+    <div class="card border-0 shadow-sm flex-fill">
+      <div class="card-header text-white fw-bold" style="background-color: #002e72;">
+        <i class="bi bi-clipboard-check me-2"></i> Progress Reports
+      </div>
+      <div class="card-body" style="max-height: 300px; overflow-y: auto;">
+        {% if reports %}
+          <div class="list-group">
+            {% for r in reports %}
+              <div class="list-group-item list-group-item-action mb-2 rounded-3 shadow-sm">
+                <div class="d-flex justify-content-between align-items-start">
+                  <div>
+                    <strong>{{ r.personnel.get_full_name|default:r.personnel.username }}</strong><br>
+                    <small>{{ r.report_text }}</small>
+                  </div>
+                  <small class="text-muted">{{ r.created_at|date:"Y-m-d H:i" }}</small>
+                </div>
+              </div>
+            {% endfor %}
+          </div>
+        {% else %}
+          <p class="text-muted mb-0">No reports yet.</p>
+        {% endif %}
+      </div>
+    </div>
+
+
+
+
+
+
 
   </div>
 </div>

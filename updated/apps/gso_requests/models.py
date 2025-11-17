@@ -36,8 +36,27 @@ class ServiceRequest(models.Model):
     custom_contact_number = models.CharField(max_length=50, blank=True, null=True)
     attachment = models.ImageField(upload_to='request_attachments/', blank=True, null=True)
 
+
+
+    # Request categories chosen by the requestor
+    labor = models.BooleanField(default=False)
+    materials_needed = models.BooleanField(default=False)
+    others_needed = models.BooleanField(default=False)
+
+
+
+
     # 🚨 Emergency flag
     is_emergency = models.BooleanField(default=False)
+
+
+
+    # Scheduling
+    schedule_start = models.DateTimeField(null=True, blank=True)
+    schedule_end = models.DateTimeField(null=True, blank=True)
+    schedule_remarks = models.TextField(null=True, blank=True)
+
+
 
     # Details
     activity_name = models.CharField(

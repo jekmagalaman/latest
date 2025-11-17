@@ -1,6 +1,7 @@
 {% extends "gso_office/gso_base_dashboard.html" %}
 {% block title %}Request Management{% endblock %}
 
+{% load static %}
 
 <!-- ===== HEADER ===== -->
 {% block page_header %}
@@ -21,8 +22,6 @@
 </form>
 {% endblock %}
 
-
-
 {% block main_content %}
 <!-- ===== REQUEST TABLE ===== -->
 <div class="table-responsive">
@@ -30,7 +29,7 @@
     <thead class="table-light">
       <tr>
         <th>ID</th>
-        <th>Date</th>
+        <th>Date Submitted</th>
         <th>Requestor</th>
         <th>Department</th>
         <th>Unit</th>
@@ -49,19 +48,43 @@
         <td>{{ req.unit.name }}</td>
         <td>{{ req.assigned_personnel_names|default:"— Unassigned —" }}</td>
         <td>
-          <span class="status-badge {% if req.status == 'Pending' %}pending
-                                    {% elif req.status == 'Approved' %}approved
-                                    {% elif req.status == 'In Progress' %}in-progress
-                                    {% elif req.status == 'Done for Review' %}review
-                                    {% elif req.status == 'Completed' %}completed
-                                    {% elif req.status == 'Cancelled' %}cancelled
-                                    {% endif %}">
+          <span class="status-badge 
+                {% if req.status == 'Pending' %}pending
+                {% elif req.status == 'Approved' %}approved
+                {% elif req.status == 'In Progress' %}in-progress
+                {% elif req.status == 'Done for Review' %}review
+                {% elif req.status == 'Completed' %}completed
+                {% elif req.status == 'Cancelled' %}cancelled
+                {% elif req.status == 'Emergency' %}emergency
+                {% endif %}">
+            {% if req.is_emergency %}
+              <span>
+                <img src="{% static 'images/emergency.png' %}" 
+                    alt="Emergency" 
+                    class="status-emergency-icon">
+              </span>
+            {% endif %}
+
             {{ req.status }}
           </span>
         </td>
         <td class="text-center">
           <button class="btn btn-sm btn-outline-primary px-2"
-                  onclick="openModalWithUrl('{{ req.id }}')">
+            onclick="openModal(
+              '{{ req.id }}',
+              '{{ req.created_at|date:"Y-m-d" }}',
+              '{{ req.custom_full_name|default:req.requestor.username|escapejs }}',
+              '{{ req.requestor.department|escapejs }}',
+              '{{ req.unit.name|escapejs }}',
+              '{{ req.description|escapejs }}',
+              '{{ req.status|escapejs }}',
+              '{{ req.assigned_personnel_names|escapejs }}',
+              `{% for rm in req.requestmaterial_set.all %}{{ rm.material.name|escapejs }} ({{ rm.quantity }} {{ rm.material.unit|escapejs }}){% if not forloop.last %}, {% endif %}{% endfor %}`,
+              `{% for r in req.reports.all %}<strong>{{ r.personnel.get_full_name|escapejs }}</strong> ({{ r.created_at|date:"Y-m-d H:i" }}): {{ r.report_text|escapejs }}<br>{% endfor %}`,
+              '{{ req.labor }}',
+              '{{ req.materials_needed }}',
+              '{{ req.others_needed }}'
+            )">
             <i class="bi bi-eye"></i> View
           </button>
         </td>
@@ -77,50 +100,89 @@
   </table>
 </div>
 
-<!-- ===== MODAL (dynamic content) ===== -->
+<!-- ===== MODAL (modernized UI) ===== -->
 <div class="modal fade" id="requestModal" tabindex="-1" aria-hidden="true">
   <div class="modal-dialog modal-lg modal-dialog-centered modal-dialog-scrollable">
-    <div class="modal-content">
-      <!-- content loaded via AJAX -->
+    <div class="modal-content modern-modal">
+      <div class="modal-header border-0 pb-0">
+        <h5 class="modal-title fw-bold">
+          <i class="bi bi-info-circle me-2 text-primary"></i> Request Details
+        </h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+
+      <div class="modal-body">
+        <div class="modal-section">
+          <h6 class="section-title">General Information</h6>
+          <div class="info-grid">
+            <div><label>Date</label><span id="modal-date"></span></div>
+            <div><label>Requesting Office</label><span id="modal-office"></span></div>
+            <div><label>Requestor Name</label><span id="modal-requestor"></span></div>
+            <div><label>Unit</label><span id="modal-unit"></span></div>
+            <div><label>Category</label><span id="modal-category"></span></div>
+          </div>
+        </div>
+
+        <div class="modal-section">
+          <h6 class="section-title">Description</h6>
+          <p id="modal-description" class="boxed-text"></p>
+        </div>
+
+        <div class="modal-section">
+          <h6 class="section-title">Assigned Personnel</h6>
+          <p id="modal-personnel" class="boxed-text"></p>
+        </div>
+
+        <div class="modal-section">
+          <h6 class="section-title">Materials Used</h6>
+          <p id="modal-materials" class="boxed-text"></p>
+        </div>
+
+        <div class="modal-section">
+          <h6 class="section-title">Personnel Reports</h6>
+          <div id="modal-reports" class="boxed-text"></div>
+        </div>
+
+        <div class="modal-section">
+          <h6 class="section-title">Status</h6>
+          <span id="modal-status" class="status-badge 
+                {% if req.status == 'Pending' %}pending
+                {% elif req.status == 'Approved' %}approved
+                {% elif req.status == 'In Progress' %}in-progress
+                {% elif req.status == 'Done for Review' %}review
+                {% elif req.status == 'Completed' %}completed
+                {% elif req.status == 'Cancelled' %}cancelled
+                {% elif req.status == 'Emergency' %}emergency
+                {% endif %}">
+            {% if req.is_emergency %}
+              <span>
+                <img src="{% static 'images/emergency.png' %}" 
+                    alt="Emergency" 
+                    class="status-emergency-icon">
+              </span>
+            {% endif %}
+
+            {{ req.status }}
+          </span>
+        </div>
+      </div>
+
+      <div class="modal-footer border-0">
+        {% if user.role == "director" %}
+        <form id="approveForm" method="POST" action="">
+          {% csrf_token %}
+          <button type="submit" class="approve-btn">
+            <i class="bi bi-check-circle me-1"></i> Approve Request
+          </button>
+        </form>
+        {% endif %}
+      </div>
     </div>
   </div>
 </div>
 
-<!-- ===== SCRIPT ===== -->
-<script>
-document.addEventListener('DOMContentLoaded', () => {
-  const modal = new bootstrap.Modal(document.getElementById('requestModal'));
-  const modalContent = document.querySelector('#requestModal .modal-content');
-
-  // expose function globally for inline onclick
-  window.openModalWithUrl = function(requestId) {
-    fetch(`/gso_requests/${requestId}/`)
-      .then(response => response.text())
-      .then(html => {
-        modalContent.innerHTML = html;
-        modal.show();
-        history.pushState({ modalOpen: true }, '', `/gso_requests/${requestId}/`);
-      })
-      .catch(err => console.error('Error loading modal:', err));
-  }
-
-  // When modal closes, revert URL
-  document.getElementById('requestModal').addEventListener('hidden.bs.modal', () => {
-    if (history.state?.modalOpen) history.pushState({}, '', '/gso_requests/');
-  });
-
-  // Handle browser back/forward buttons
-  window.addEventListener('popstate', (event) => {
-    if (!event.state?.modalOpen) modal.hide();
-  });
-
-  // Auto-open modal if user loaded a detail URL directly
-  const match = window.location.pathname.match(/\/gso_requests\/(\d+)\/$/);
-  if (match) openModalWithUrl(match[1]);
-});
-</script>
-
-
-
+{% block extra_js %}
+<script src="{% static 'js/gso/request_management.js' %}"></script>
+{% endblock %}
 
 {% endblock %}

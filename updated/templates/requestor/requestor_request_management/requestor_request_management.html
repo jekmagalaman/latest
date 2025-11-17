@@ -51,10 +51,23 @@
             {% endif %}
           </td>
           <td>
-            <button class="btn btn-sm btn-outline-primary"
-              onclick="openRequestModal('{{ req.id }}','{{ req.unit.name }}','{{ req.created_at|date:'Y-m-d' }}','{{ req.status }}','{{ req.description|escapejs }}','{{ req.assigned_personnel.first.get_full_name|default:'Unassigned' }}')">
-              <i class="bi bi-eye me-1"></i> View
+            <button 
+              class="btn btn-sm btn-outline-primary"
+              onclick="openRequestModal(
+                  '{{ req.id }}',
+                  '{{ req.unit.name }}',
+                  '{{ req.created_at|date:'M d, Y' }}',
+                  '{{ req.status }}',
+                  '{{ req.description|escapejs }}',
+                  '{{ req.assigned_personnel_names|default:'' }}',
+                  '{{ req.labor }}',
+                  '{{ req.materials_needed }}',
+                  '{{ req.others_needed }}'
+              )">
+              View
             </button>
+
+
 
             {% if req.status == "Completed" %}
               {% if not req.has_feedback %}
@@ -125,6 +138,7 @@
             <label><input type="checkbox" name="labor" value="1"> LABOR</label>
             <label><input type="checkbox" name="materials" value="1"> MATERIALS</label>
             <label><input type="checkbox" name="others" value="1"> OTHERS</label>
+
           </div>
         </div>
 
@@ -166,6 +180,7 @@
       <p><strong>Job No:</strong> <span id="view-id"></span></p>
       <p><strong>Unit:</strong> <span id="view-unit"></span></p>
       <p><strong>Date:</strong> <span id="view-date"></span></p>
+      <p><strong>Category:</strong> <span id="view-category"></span></p>
       <p><strong>Status:</strong> <span id="view-status"></span></p>
       <p><strong>Assigned Personnel:</strong> <span id="view-personnel"></span></p>
       <p><strong>Description:</strong></p>
@@ -311,13 +326,27 @@
     formModal2.style.display = "none";
   }
 
-  function openRequestModal(id, unit, date, status, description, personnel) {
+  // ✅ UPDATED openRequestModal to show categories
+  function openRequestModal(id, unit, date, status, description, personnel, labor, materials, others) {
     document.getElementById("view-id").textContent = id;
     document.getElementById("view-unit").textContent = unit;
     document.getElementById("view-date").textContent = date;
     document.getElementById("view-status").textContent = status;
     document.getElementById("view-description").textContent = description;
     document.getElementById("view-personnel").textContent = personnel;
+
+    // Convert to booleans if needed
+    labor = labor === "True" || labor === true;
+    materials = materials === "True" || materials === true;
+    others = others === "True" || others === true;
+
+    // Build category string
+    const categories = [];
+    if (labor) categories.push("Labor");
+    if (materials) categories.push("Materials");
+    if (others) categories.push("Others");
+
+    document.getElementById("view-category").textContent = categories.length ? categories.join(", ") : "None";
 
     const footer = document.getElementById("modal-footer-actions");
     footer.innerHTML = "";
@@ -403,6 +432,7 @@
     });
   });
 </script>
+
 
 
 {% endblock %}

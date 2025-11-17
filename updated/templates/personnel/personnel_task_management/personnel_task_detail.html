@@ -2,6 +2,7 @@
 {% block title %}Task Detail{% endblock %}
 
 {% load custom_tags %}
+{% load static %}
 
 
 
@@ -75,16 +76,26 @@
       <div class="col-md-6 border-start ps-4">
         <div class="mb-3">
           <strong>Status:</strong>
-          <span class="badge fs-6 px-3 py-2 rounded-pill
-            {% if task.status == 'Pending' %} bg-warning text-dark
-            {% elif task.status == 'Approved' %} bg-info text-dark
-            {% elif task.status == 'In Progress' %} bg-primary
-            {% elif task.status == 'Done for Review' %} bg-secondary
-            {% elif task.status == 'Completed' %} bg-success
-            {% elif task.status == 'Cancelled' %} bg-danger
-            {% else %} bg-light text-dark {% endif %}">
+          <span class="status-badge 
+                {% if task.status == 'Pending' %}pending
+                {% elif task.status == 'Approved' %}approved
+                {% elif task.status == 'In Progress' %}in-progress
+                {% elif task.status == 'Done for Review' %}review
+                {% elif task.status == 'Completed' %}completed
+                {% elif task.status == 'Cancelled' %}cancelled
+                {% elif task.status == 'Emergency' %}emergency
+                {% endif %}">
+            {% if task.is_emergency %}
+              <span>
+                <img src="{% static 'images/emergency.png' %}" 
+                    alt="Emergency" 
+                    class="status-emergency-icon">
+              </span>
+            {% endif %}
+
             {{ task.status }}
           </span>
+
         </div>
 
         <div class="mb-3">
@@ -117,11 +128,11 @@
     </div>
 
     <!-- Task Action Buttons -->
-    {% if task.status in "Approved,In Progress" %}
+    {% if task.status in "Approved,In Progress,Emergency" %}
     <div class="d-flex justify-content-end mt-4">
       <form method="post" class="d-flex gap-2">
         {% csrf_token %}
-        {% if task.status == "Approved" %}
+        {% if task.status == "Approved" or task.status == "Emergency" %}
           <button type="submit" name="start" class="btn btn-primary px-4">
             <i class="bi bi-play-fill me-1"></i> Start Task
           </button>

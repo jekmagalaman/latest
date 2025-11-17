@@ -3,6 +3,27 @@ from django.contrib.auth.models import AbstractUser, Group, Permission
 from django.core.exceptions import ValidationError
 from django.conf import settings
 
+
+
+class Position(models.Model):
+    name = models.CharField(max_length=100, unique=True)
+
+    def __str__(self):
+        return self.name
+    
+
+class EmploymentStatus(models.Model):
+    employment_status = models.CharField(max_length=50, unique=True)
+
+    def __str__(self):
+        return self.employment_status
+
+
+
+
+
+
+
 class Unit(models.Model):
     name = models.CharField(max_length=100, unique=True)
     unit_head = models.ForeignKey(
@@ -21,6 +42,12 @@ class Department(models.Model):
 
     def __str__(self):
         return self.name
+
+
+
+
+
+
 
 
 class User(AbstractUser):
@@ -43,6 +70,8 @@ class User(AbstractUser):
     # Relations
     unit = models.ForeignKey(Unit, on_delete=models.SET_NULL, blank=True, null=True)
     department = models.ForeignKey(Department, on_delete=models.SET_NULL, blank=True, null=True)
+    position = models.ForeignKey(Position, on_delete=models.SET_NULL, blank=True, null=True)
+    employment_status = models.ForeignKey(EmploymentStatus, on_delete=models.SET_NULL, blank=True, null=True)
 
     # ✅ Fix clashes with Django auth
     groups = models.ManyToManyField(
@@ -61,6 +90,7 @@ class User(AbstractUser):
     )
 
     def clean(self):
+        # Role-based restrictions
         if self.role in ["director", "gso"] and (self.unit or self.department):
             raise ValidationError(f"{self.get_role_display()} should not be assigned to a unit or department.")
 
@@ -69,13 +99,26 @@ class User(AbstractUser):
 
         if self.role == "requestor" and not self.department:
             raise ValidationError("Requestor accounts must belong to a department.")
-        
+
+        # ✅ ALL users must have a position and employment status
+        if not self.position:
+            raise ValidationError("All users must have a position assigned.")
+
+        if not self.employment_status:
+            raise ValidationError("All users must have an employment status assigned.")
+
+        # Name requirement for main roles
         if self.role in ["director", "gso", "unit_head", "personnel"] and (not self.first_name or not self.last_name):
             raise ValidationError(f"{self.get_role_display()} accounts must have a first and last name.")
-        
 
 
     def __str__(self):
         if self.role == "requestor" and self.department:
             return f"{self.department.name} (Requestor)"
-        return f"{self.get_full_name()} ({self.get_role_display()})"
+        details = f"{self.get_full_name()} ({self.get_role_display()})"
+        if self.position:
+            details += f" - {self.position.name}"
+        if self.employment_status:
+            details += f" [{self.employment_status.employment_status}]"
+        return details
+

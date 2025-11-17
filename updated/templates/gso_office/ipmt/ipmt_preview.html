@@ -20,13 +20,22 @@
                 <th>Actual Accomplishments</th>
                 <th>Remarks</th>
                 <th class="action-col d-none">Action</th>
+                <th>AI Actions</th>
             </tr>
         </thead>
         <tbody>
             {% if reports %}
                 {% for row in reports %}
                 <tr data-row-id="{{ forloop.counter0 }}" data-war-ids="{{ row.war_ids|join:',' }}">
-                    <td>{{ row.indicator }}</td>
+                    <td>
+                        <div>
+                            <span class="fw-bold" data-indicator-code="{{ row.indicator }}">{{ row.indicator|truncatechars:20 }}</span>
+                        </div>
+                        <div class="text-muted" style="font-size: 0.85rem;">
+                            {{ row.indicator_description }}
+                        </div>
+                    </td>
+
                     <td>
                         <span class="desc-text">{{ row.description|default:"" }}</span>
                         <input class="desc-input form-control d-none" type="text" value="{{ row.description|default:"" }}">
@@ -38,11 +47,14 @@
                     <td class="action-col">
                         <button class="delete-btn btn btn-danger btn-sm d-none">Delete</button>
                     </td>
+                    <td>
+                        <button class="btn btn-sm btn-info regenerate-btn">Regenerate</button>
+                    </td>
                 </tr>
                 {% endfor %}
             {% else %}
                 <tr>
-                    <td colspan="4" class="text-center">No reports available yet.</td>
+                    <td colspan="5" class="text-center">No reports available yet.</td>
                 </tr>
             {% endif %}
         </tbody>
@@ -64,7 +76,6 @@ document.addEventListener("DOMContentLoaded", function() {
     function enterEditMode() {
         editMode = true;
         originalData = [];
-
         rows.forEach(row => {
             const descInput = row.querySelector(".desc-input");
             const remarksInput = row.querySelector(".remarks-input");
@@ -74,20 +85,14 @@ document.addEventListener("DOMContentLoaded", function() {
 
             if (!descInput) return;
 
-            originalData.push({
-                desc: descInput.value,
-                remarks: remarksInput.value
-            });
-
+            originalData.push({ desc: descInput.value, remarks: remarksInput.value });
             descText.classList.add("d-none");
             remarksText.classList.add("d-none");
             descInput.classList.remove("d-none");
             remarksInput.classList.remove("d-none");
-
             if (deleteBtn) deleteBtn.classList.remove("d-none");
             if (deleteBtn) deleteBtn.addEventListener("click", () => row.remove());
         });
-
         editBtn.classList.add("d-none");
         acceptBtn.classList.add("d-none");
         saveBtn.classList.remove("d-none");
@@ -96,19 +101,16 @@ document.addEventListener("DOMContentLoaded", function() {
 
     function exitEditMode() {
         editMode = false;
-        rows = table.querySelectorAll("tbody tr");
         rows.forEach((row, index) => {
             const descInput = row.querySelector(".desc-input");
             const remarksInput = row.querySelector(".remarks-input");
             const descText = row.querySelector(".desc-text");
             const remarksText = row.querySelector(".remarks-text");
             const deleteBtn = row.querySelector(".delete-btn");
-
             if (!descInput) return;
 
             descText.textContent = descInput.value;
             remarksText.textContent = remarksInput.value;
-
             descText.classList.remove("d-none");
             remarksText.classList.remove("d-none");
             descInput.classList.add("d-none");
@@ -140,9 +142,15 @@ document.addEventListener("DOMContentLoaded", function() {
         rows.forEach(row => {
             const descInput = row.querySelector(".desc-input");
             const remarksInput = row.querySelector(".remarks-input");
+
+            const code = row.querySelector("[data-indicator-code]").dataset.indicatorCode.trim();
+            const desc = row.querySelector(".text-muted").textContent.trim();
+            const combinedIndicator = `${code} - ${desc}`;  // CLEAN, NO EXTRA SPACES
+
             if (!descInput) return;
+
             payload.push({
-                indicator: row.children[0].textContent.trim(),
+                indicator: combinedIndicator,
                 description: descInput.value.trim(),
                 remarks: remarksInput.value.trim(),
                 war_ids: row.dataset.warIds.split(",").filter(Boolean).map(Number)
@@ -158,7 +166,7 @@ document.addEventListener("DOMContentLoaded", function() {
             body: JSON.stringify({
                 month: "{{ month_filter }}",
                 unit: "{{ unit_filter }}",
-                personnel: {{ personnel_names|safe }}.join(","),
+                personnel: {{ personnel_names|safe }},
                 rows: payload
             })
         });
@@ -171,7 +179,7 @@ document.addEventListener("DOMContentLoaded", function() {
         }
     });
 
-    // ✅ FIXED EXPORT SECTION
+
     acceptBtn?.addEventListener("click", function() {
         const payload = [];
         rows.forEach(row => {
@@ -208,7 +216,6 @@ document.addEventListener("DOMContentLoaded", function() {
         unitInput.value = "{{ unit_filter }}";
         form.appendChild(unitInput);
 
-        // ✅ FIX: Include personnel names
         const personnelInput = document.createElement("input");
         personnelInput.type = "hidden";
         personnelInput.name = "personnel";
@@ -225,6 +232,45 @@ document.addEventListener("DOMContentLoaded", function() {
         form.submit();
     });
 
+    // -------------------------------
+    // Regenerate Summary Button Handler
+    // -------------------------------
+    document.querySelectorAll(".regenerate-btn").forEach(btn => {
+        btn.addEventListener("click", async function() {
+            const row = btn.closest("tr");
+            const indicator = row.querySelector("td span").textContent.trim();
+            const month = "{{ month_filter }}";
+            const personnel = "{{ personnel_names|join:',' }}";
+
+            const oldText = btn.textContent;
+            btn.textContent = "Regenerating...";
+            btn.disabled = true;
+
+            try {
+                const response = await fetch("{% url 'ai_service:regenerate_ipmt_summary' %}", {
+                    method: "POST",
+                    headers: {
+                        "Content-Type": "application/json",
+                        "X-CSRFToken": "{{ csrf_token }}"
+                    },
+                    body: JSON.stringify({ personnel, indicator, month })
+                });
+
+                if (response.ok) {
+                    const data = await response.json();
+                    row.querySelector(".desc-text").textContent = data.summary;
+                    row.querySelector(".desc-input").value = data.summary;
+                } else {
+                    alert("Failed to regenerate summary.");
+                }
+            } catch (e) {
+                alert("Error: " + e.message);
+            } finally {
+                btn.textContent = oldText;
+                btn.disabled = false;
+            }
+        });
+    });
 });
 </script>
 {% endblock %}

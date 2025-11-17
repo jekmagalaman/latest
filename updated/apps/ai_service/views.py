@@ -1,10 +1,54 @@
+# apps/ai_service/views.py
+import json
+from django.http import JsonResponse
 from django.shortcuts import render, get_object_or_404, redirect
-from django.contrib.auth.decorators import login_required
+from django.contrib.auth.decorators import login_required, user_passes_test
 from django.contrib import messages
 
 from .models import AIReportSummary
-from apps.gso_reports.models import WorkAccomplishmentReport
-from .tasks import generate_war_description, generate_ipmt_summary
+from .utils import generate_ipmt_summary_sync, get_user_by_identifier
+from apps.gso_reports.models import WorkAccomplishmentReport, IPMT, SuccessIndicator
+
+# -------------------------------
+# Role Checks
+# -------------------------------
+def is_gso_or_director(user):
+    return user.is_authenticated and user.role in ["gso", "director"]
+
+
+@login_required
+@user_passes_test(is_gso_or_director)
+def regenerate_ipmt_summary(request):
+    if request.method != "POST":
+        return JsonResponse({"error": "POST required"}, status=400)
+
+    data = json.loads(request.body)
+    personnel = data.get("personnel")
+    indicator = data.get("indicator")
+    month = data.get("month")
+
+    user = get_user_by_identifier(personnel)
+    si = SuccessIndicator.objects.filter(code=indicator).first()
+
+    ipmt_obj = IPMT.objects.filter(
+        personnel=user,
+        indicator=si,
+        month=month
+    ).first()
+
+    if not ipmt_obj:
+        return JsonResponse({"error": "IPMT not found"}, status=404)
+
+    # Get linked WARs
+    war_ids = [w.id for w in ipmt_obj.reports.all()]
+
+    summary_dict = generate_ipmt_summary_sync(war_ids)
+    new_summary = summary_dict.get(indicator, "")
+
+    ipmt_obj.accomplishment = new_summary
+    ipmt_obj.save(update_fields=["accomplishment"])
+
+    return JsonResponse({"summary": new_summary})
 
 
 @login_required
@@ -29,13 +73,16 @@ def ai_summary_detail(request, report_id):
 @login_required
 def generate_ai_summary(request, report_id):
     """
-    Trigger Celery task to generate AI summary for a WAR.
+    Trigger synchronous generation of an AI summary for a WAR (Option B: no Celery).
     """
     report = get_object_or_404(WorkAccomplishmentReport, id=report_id)
 
     if request.method == "POST":
-        generate_war_description.delay(report.id)  # async task
-        messages.success(request, f"AI summary generation started for WAR #{report.id}.")
+        ai_summary = generate_war_description_sync(report.id)
+        if ai_summary:
+            messages.success(request, f"AI summary generated for WAR #{report.id}.")
+        else:
+            messages.error(request, f"Failed to generate AI summary for WAR #{report.id}.")
         return redirect("ai_service:ai_summary_detail", report_id=report.id)
 
     return render(request, "ai_service/generate_ai_summary.html", {"report": report})
@@ -44,8 +91,8 @@ def generate_ai_summary(request, report_id):
 @login_required
 def generate_ipmt_ai_summary(request, unit_name, month_filter):
     """
-    Trigger Celery task to generate AI summary for IPMT.
-    Now works directly on IPMT rows rather than drafts.
+    Trigger synchronous generation of IPMT AI summaries for a unit+month.
+    This view collects WAR ids for the requested unit/month, then calls the sync helper.
     """
     from apps.gso_reports.utils import collect_ipmt_reports
 
@@ -58,10 +105,12 @@ def generate_ipmt_ai_summary(request, unit_name, month_filter):
     reports = collect_ipmt_reports(year, month_num, unit_name)
 
     if request.method == "POST":
-        # Assuming generate_ipmt_summary can accept multiple rows
-        report_ids = [r["war_id"] for r in reports if r["war_id"]]
-        generate_ipmt_summary.delay(report_ids)
-        messages.success(request, f"AI summary generation started for IPMT {unit_name} {month_filter}.")
+        report_ids = [r["war_id"] for r in reports if r.get("war_id")]
+        results = generate_ipmt_summary_sync(report_ids)
+
+        # Optionally: persist or process `results` (mapping indicator -> remark).
+        # For now we show a success message and redirect.
+        messages.success(request, f"AI IPMT summaries generated for {unit_name} {month_filter}.")
         return redirect("gso_reports:preview_ipmt")
 
     return render(request, "ai_service/generate_ipmt_summary.html", {

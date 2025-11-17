@@ -1,68 +1,77 @@
 # apps/ai_service/tasks.py
-from apps.gso_reports.models import WorkAccomplishmentReport, SuccessIndicator
-from .utils import generate_war_description, generate_ipmt_summary
+from typing import List, Dict
+from apps.gso_reports.models import WorkAccomplishmentReport
+from .models import AIReportSummary
+from .utils import query_local_ai, generate_ipmt_summary as utils_generate_ipmt_summary
 
-# -------------------------------
-# Generate WAR AI Description
-# -------------------------------
-def generate_war_description(war_id: int):
+def generate_war_description_sync(war_id: int) -> AIReportSummary | None:
     """
-    Generate AI description for a specific Work Accomplishment Report (WAR)
-    using the OpenRouter DeepSeek model.
-    Updates the WAR.description field directly.
+    Synchronous helper: generate an AI summary for a Work Accomplishment Report (WAR),
+    save it to AIReportSummary and return the created instance (or None if not found).
     """
     try:
         war = WorkAccomplishmentReport.objects.get(id=war_id)
-
-        activity_name = war.activity_name or "Miscellaneous"
-        unit_name = war.unit.name if war.unit else None
-        personnel_names = [p.get_full_name() for p in war.assigned_personnel.all()] if war.assigned_personnel.exists() else None
-
-        description = generate_war_description(
-            activity_name=activity_name,
-            unit=unit_name,
-            personnel_names=personnel_names
-        )
-
-        war.description = description
-        war.save(update_fields=["description"])
-        return description
     except WorkAccomplishmentReport.DoesNotExist:
         return None
 
-# -------------------------------
-# Generate IPMT AI Summary
-# -------------------------------
-def generate_ipmt_summary(unit_name: str, month_filter: str):
-    from apps.gso_reports.utils import collect_ipmt_reports
+    # Build a compact prompt from the WAR fields (safe, minimal assumptions about model)
+    war_desc = (war.description or "").strip() or "No description provided."
+    activity = getattr(war, "activity_name", None) or getattr(war, "title", None) or "Work activity"
+    unit_name = war.unit.name if getattr(war, "unit", None) else "General Services"
+
+    prompt = (
+        "You are an AI that generates short, professional government work logs.\n\n"
+        f"Unit: {unit_name}\n"
+        f"Activity: {activity}\n\n"
+        f"WAR description:\n{war_desc}\n\n"
+        "Write ONE concise sentence that summarizes the accomplishment clearly and factually. "
+        "Do not include names or personnel, focus only on the task performed. "
+        "Keep it formal, brief, and specific."
+    )
+
+    result = query_local_ai(prompt)
+
+    ai_summary = AIReportSummary.objects.create(
+        report=war,
+        summary_text=result
+    )
+
+    return ai_summary
+
+
+def generate_ipmt_summary_sync(report_ids: List[int]) -> Dict[str, str]:
     """
-    Generate AI summaries for IPMT rows for a given unit and month.
-    Uses all WAR descriptions related to the unit and month.
-    Returns a list of updated rows with 'remarks'.
+    Synchronous IPMT summary generator.
+
+    - Accepts a list of WAR ids (report_ids).
+    - Groups WARs by their success_indicator (best-effort using attribute names).
+    - Calls utils.generate_ipmt_summary(success_indicator, war_descriptions) for each group.
+    - Returns a dict mapping success_indicator -> generated remark.
     """
-    try:
-        year, month_num = map(int, month_filter.split("-"))
-    except ValueError:
-        return []
+    wars = WorkAccomplishmentReport.objects.filter(id__in=report_ids)
 
-    # Collect IPMT rows
-    ipmt_rows = collect_ipmt_reports(year, month_num, unit_name)
+    # Group descriptions by success indicator (use fallback "General" if not present)
+    groups: Dict[str, List[str]] = {}
+    for w in wars:
+        # try common attribute names
+        indicator = None
+        for attr in ("success_indicator", "indicator", "indicator_code", "si_code"):
+            if hasattr(w, attr):
+                indicator = getattr(w, attr)
+                break
+        if not indicator:
+            indicator = "General"
 
-    updated_rows = []
+        desc = (w.description or "").strip()
+        if not desc:
+            continue
 
-    for row in ipmt_rows:
-        war_id = row.get("war_id")
-        description = row.get("description", "")
-        indicator_code = row.get("indicator")
+        groups.setdefault(str(indicator), []).append(desc)
 
-        # Generate AI remarks only if there is a description
-        if description:
-            remarks = generate_ipmt_summary(
-                success_indicator=indicator_code,
-                war_descriptions=[description]
-            )
-            row["remarks"] = remarks
+    results: Dict[str, str] = {}
+    for indicator, descriptions in groups.items():
+        # Call the utility to create a concise summary for this indicator
+        remark = utils_generate_ipmt_summary(indicator, descriptions)
+        results[indicator] = remark
 
-        updated_rows.append(row)
-
-    return updated_rows
+    return results
