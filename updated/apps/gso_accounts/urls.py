@@ -26,7 +26,6 @@ urlpatterns = [
 
     # Requestor Views
     path('requestor/account/', views.requestor_account, name='requestor_account'),
-    path('requestor/profile/', views.requestor_profile, name='requestor_profile'),
 
 
     # AJAX endpoint

@@ -28,15 +28,57 @@ class UserForm(forms.ModelForm):
             "department",
             "account_status",
             "password",
+            "confirm_password",
         ]
 
     def clean(self):
         cleaned_data = super().clean()
+        role = cleaned_data.get("role")
+        unit = cleaned_data.get("unit")
+        position = cleaned_data.get("position")
+        employment_status = cleaned_data.get("employment_status")
+        department = cleaned_data.get("department")
         password = cleaned_data.get("password")
         confirm_password = cleaned_data.get("confirm_password")
 
+        # 🔐 Password match
         if password and confirm_password and password != confirm_password:
             raise forms.ValidationError("Passwords do not match.")
+
+        # ==============================
+        # ROLE-BASED FORM VALIDATION
+        # ==============================
+
+        # ❌ DIRECTOR & REQUESTOR cannot have position or employment status
+        if role in ["director", "requestor"]:
+            if position:
+                raise forms.ValidationError(f"{role.title()} must NOT have a position.")
+            if employment_status:
+                raise forms.ValidationError(f"{role.title()} must NOT have an employment status.")
+
+        # REQUESTOR → must have department, no unit
+        if role == "requestor":
+            if not department:
+                raise forms.ValidationError("Requestor must have a department assigned.")
+            if unit:
+                raise forms.ValidationError("Requestor cannot belong to a unit.")
+
+        # DIRECTOR & GSO → no unit, no department
+        if role in ["director", "gso"]:
+            if unit:
+                raise forms.ValidationError(f"{role.title()} must NOT belong to a unit.")
+            if department:
+                raise forms.ValidationError(f"{role.title()} must NOT belong to a department.")
+
+        # UNIT HEAD & PERSONNEL → must have unit + position + employment status
+        if role in ["unit_head", "personnel"]:
+            if not unit:
+                raise forms.ValidationError(f"{role.title()} must belong to a unit.")
+            if not position:
+                raise forms.ValidationError(f"{role.title()} must have a position.")
+            if not employment_status:
+                raise forms.ValidationError(f"{role.title()} must have an employment status.")
+
         return cleaned_data
 
     def save(self, commit=True):
@@ -47,6 +89,7 @@ class UserForm(forms.ModelForm):
         if commit:
             user.save()
         return user
+
 
 
 class UserEditForm(forms.ModelForm):
@@ -84,20 +127,58 @@ class UserEditForm(forms.ModelForm):
 
     def clean(self):
         cleaned_data = super().clean()
+        role = cleaned_data.get("role")
+        unit = cleaned_data.get("unit")
+        position = cleaned_data.get("position")
+        employment_status = cleaned_data.get("employment_status")
+        department = cleaned_data.get("department")
+
         old_pass = cleaned_data.get("old_password")
         new_pass = cleaned_data.get("new_password")
         confirm_pass = cleaned_data.get("confirm_password")
 
-        # Only validate if user wants to change password
+        # ====================
+        # PASSWORD UPDATE RULES
+        # ====================
         if new_pass or confirm_pass:
             if new_pass != confirm_pass:
                 raise forms.ValidationError("New password and confirmation do not match.")
 
-            if old_pass:
-                if not self.instance.check_password(old_pass):
-                    raise forms.ValidationError("Old password is incorrect.")
-            else:
-                raise forms.ValidationError("Please enter your old password to set a new password.")
+            if not old_pass:
+                raise forms.ValidationError("Enter old password to set a new password.")
+
+            if not self.instance.check_password(old_pass):
+                raise forms.ValidationError("Old password is incorrect.")
+
+        # ====================
+        # ROLE-BASED VALIDATION
+        # ====================
+
+        if role in ["director", "requestor"]:
+            if position:
+                raise forms.ValidationError(f"{role.title()} must NOT have a position.")
+            if employment_status:
+                raise forms.ValidationError(f"{role.title()} must NOT have an employment status.")
+
+        if role == "requestor":
+            if not department:
+                raise forms.ValidationError("Requestor must have a department.")
+            if unit:
+                raise forms.ValidationError("Requestor cannot belong to a unit.")
+
+        if role in ["director", "gso"]:
+            if unit:
+                raise forms.ValidationError(f"{role.title()} must not belong to a unit.")
+            if department:
+                raise forms.ValidationError(f"{role.title()} must not belong to a department.")
+
+        if role in ["unit_head", "personnel"]:
+            if not unit:
+                raise forms.ValidationError(f"{role.title()} must belong to a unit.")
+            if not position:
+                raise forms.ValidationError(f"{role.title()} must have a position.")
+            if not employment_status:
+                raise forms.ValidationError(f"{role.title()} must have an employment status.")
 
         return cleaned_data
 
@@ -109,6 +190,7 @@ class UserEditForm(forms.ModelForm):
         if commit:
             user.save()
         return user
+
 
 
 class RequestorProfileUpdateForm(forms.ModelForm):

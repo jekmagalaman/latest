@@ -88,24 +88,29 @@ def generate_war_description(request_obj: ServiceRequest) -> str:
         report_texts = [r.report_text.strip() for r in task_reports if r.report_text.strip()]
         reports_str = "\n".join([f"- {txt}" for txt in report_texts]) or "No personnel reports available."
 
+        department_name = request_obj.department if request_obj.department else "the designated office"
+
         prompt = (
-            "You generate Work Accomplishment Report (WAR) statements.\n"
-            "STRICT OUTPUT MODE:\n"
+            "Generate a Work Accomplishment Report (WAR) statement.\n\n"
+            "STRICT RULES:\n"
             "- Output ONLY ONE sentence.\n"
-            "- DO NOT provide explanations.\n"
-            "- DO NOT restate the instructions.\n"
-            "- DO NOT add any commentary.\n"
-            "- DO NOT include quotes.\n"
-            "- DO NOT add context, assumptions, or invented details.\n"
-            "- Use ONLY the information provided.\n"
-            "- Write from the perspective of the unit performing the task.\n"
-            "- No pronouns like our/my/their.\n"
-            "- No mentioning names.\n\n"
+            "- Use ONLY the exact information found in the request description and personnel reports.\n"
+            "- DO NOT guess or create equipment names.\n"
+            "- DO NOT add any assumptions or invented context.\n"
+            "- If equipment or item appears in the personnel report, include it.\n"
+            "- If the department/office is provided, include it at the end of the sentence.\n"
+            "- Write from the perspective of the unit performing the work.\n"
+            "- No pronouns (no our/my/their).\n"
+            "- No names of people.\n"
+            "- Start with a clear action verb such as Completed, Conducted, Performed, Executed.\n"
+            "- Combine the request description with what was actually accomplished.\n\n"
             f"Unit: {unit_name}\n"
+            f"Department/Office: {department_name}\n"
             f"Request description: {requestor_description}\n"
             f"Personnel reports: {reports_str}\n\n"
-            "Now produce the ONE SENTENCE accomplishment statement:"
+            "Now produce the final one-sentence accomplishment strictly based on the provided information:"
         )
+
 
         return query_local_ai(prompt).strip()
 

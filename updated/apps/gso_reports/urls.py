@@ -10,6 +10,14 @@ urlpatterns = [
     path("ipmt/preview/", views.preview_ipmt, name="preview_ipmt"),
     path('war-description/<int:war_id>/', views.get_war_description, name='get_war_description'),
 
+    path("war/save/", views.save_war, name="save_war"),
+    path("war/generate/", views.generate_war, name="generate_war"),
+
+
+
+    # New unified preview
+    path("preview-report/", views.preview_report, name="preview_report"),
+
     #kasama sa 10/28/25 edits#
     path("update-success-indicator/", views.update_success_indicator, name="update_success_indicator"),
 

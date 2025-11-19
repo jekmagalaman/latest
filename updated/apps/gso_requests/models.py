@@ -3,9 +3,12 @@ from django.conf import settings
 from apps.gso_accounts.models import Unit, Department
 from apps.gso_inventory.models import InventoryItem
 from apps.gso_reports.models import SuccessIndicator 
+from auditlog.registry import auditlog
+from auditlog.models import AuditlogHistoryField
 
 
 class ServiceRequest(models.Model):
+    auditlog_history = AuditlogHistoryField()
     """
     Represents a service request submitted by a user (requestor).
     Tracks workflow status, assigned personnel, and requested materials.
@@ -34,8 +37,7 @@ class ServiceRequest(models.Model):
     custom_full_name = models.CharField(max_length=255, blank=True, null=True)
     custom_email = models.EmailField(blank=True, null=True)
     custom_contact_number = models.CharField(max_length=50, blank=True, null=True)
-    attachment = models.ImageField(upload_to='request_attachments/', blank=True, null=True)
-
+    attachment_link = models.URLField(max_length=500, blank=True, null=True)
 
 
     # Request categories chosen by the requestor
@@ -43,20 +45,14 @@ class ServiceRequest(models.Model):
     materials_needed = models.BooleanField(default=False)
     others_needed = models.BooleanField(default=False)
 
-
-
-
+    
     # 🚨 Emergency flag
     is_emergency = models.BooleanField(default=False)
-
-
 
     # Scheduling
     schedule_start = models.DateTimeField(null=True, blank=True)
     schedule_end = models.DateTimeField(null=True, blank=True)
     schedule_remarks = models.TextField(null=True, blank=True)
-
-
 
     # Details
     activity_name = models.CharField(
@@ -113,6 +109,7 @@ class ServiceRequest(models.Model):
 
 
 class RequestMaterial(models.Model):
+    auditlog_history = AuditlogHistoryField()
     """Through model for materials used in a request."""
     request = models.ForeignKey(ServiceRequest, on_delete=models.CASCADE)
     material = models.ForeignKey(InventoryItem, on_delete=models.CASCADE)
@@ -123,6 +120,7 @@ class RequestMaterial(models.Model):
 
 
 class TaskReport(models.Model):
+    auditlog_history = AuditlogHistoryField()
     """Individual report written by personnel assigned to a request."""
     request = models.ForeignKey(ServiceRequest, on_delete=models.CASCADE, related_name="reports")
     personnel = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE)
@@ -135,6 +133,7 @@ class TaskReport(models.Model):
 
 
 class Feedback(models.Model):
+    auditlog_history = AuditlogHistoryField()
     """Feedback form tied to a specific service request."""
     request = models.OneToOneField(ServiceRequest, on_delete=models.CASCADE, related_name='feedback')
     user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE)
@@ -179,3 +178,22 @@ class Feedback(models.Model):
     def __str__(self):
         return f"Feedback for Request #{self.request.id} by {self.user.username}"
 
+
+
+
+
+
+
+# -----------------------------
+# Register ServiceRequest with Auditlog
+# -----------------------------
+auditlog.register(
+    ServiceRequest,
+    m2m_fields={"assigned_personnel", "materials"},  # Track changes on M2M
+    serialize_data=True,                              # Store entire state
+    serialize_auditlog_fields_only=True               # Only include fields tracked by Auditlog
+)
+#auditlog.register(ServiceRequest) #new
+auditlog.register(TaskReport) #new
+auditlog.register(RequestMaterial) #new
+    

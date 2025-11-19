@@ -2,15 +2,12 @@
 
 {% block title %}Work Accomplishment Report{% endblock %}
 
-{% load static %}
-
-
-
 <!-- ======= PAGE HEADER ======= -->
 {% block page_header %}
 <h1 class="page-title mb-0">Work Accomplishment Report</h1>
 {% endblock %}
 
+<!-- ======= PAGE FILTERS ======= -->
 {% block page_filter %}
 <form method="get" class="d-flex gap-2 align-items-center filter-form">
   <input 
@@ -19,6 +16,7 @@
     class="form-control form-control-sm" 
     placeholder="Search reports..." 
     value="{{ request.GET.user_status }}">
+
   <select name="unit" class="form-select form-select-sm" onchange="this.form.submit()">
     <option value="">All Units</option>
     <option value="repair and maintenance" {% if request.GET.unit == 'repair and maintenance' %}selected{% endif %}>Repair and Maintenance</option>
@@ -28,25 +26,35 @@
   </select>
 </form>
 
-<button type="button" class="btn btn-primary d-flex align-items-center" data-bs-toggle="modal" data-bs-target="#ipmtModal">
-  <i class="bi bi-file-earmark-bar-graph me-2"></i> Generate IPMT
+<button type="button" class="btn btn-primary d-flex align-items-center" data-bs-toggle="modal" data-bs-target="#reportModal">
+  <i class="bi bi-file-earmark-bar-graph me-2"></i> Generate Report
 </button>
 {% endblock %}
 
-
-
-
+<!-- ======= MAIN CONTENT ======= -->
 {% block main_content %}
-<!-- ======= IPMT MODAL ======= -->
-<div class="modal fade" id="ipmtModal" tabindex="-1" aria-labelledby="ipmtModalLabel" aria-hidden="true">
+
+<!-- ======= REPORT GENERATION MODAL ======= -->
+<div class="modal fade" id="reportModal" tabindex="-1" aria-labelledby="reportModalLabel" aria-hidden="true">
   <div class="modal-dialog modal-lg modal-dialog-centered">
     <div class="modal-content">
-      <form method="get" action="{% url 'gso_reports:preview_ipmt' %}">
+      <form method="get" action="{% url 'gso_reports:preview_report' %}">
         <div class="modal-header">
-          <h5 class="modal-title fw-semibold">Generate IPMT Report</h5>
+          <h5 class="modal-title fw-semibold">Generate Report</h5>
           <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
         </div>
         <div class="modal-body">
+
+          <!-- Report Type -->
+          <div class="mb-3">
+            <label for="report_type" class="form-label">Select Report Type</label>
+            <select name="report_type" id="report_type" class="form-select" onchange="togglePersonnelSelection()">
+              <option value="ipmt" selected>IPMT</option>
+              <option value="war">Work Accomplishment Report</option>
+            </select>
+          </div>
+
+          <!-- Unit Selection -->
           <div class="mb-3">
             <label for="unit" class="form-label">Select Unit</label>
             <select name="unit" id="unit" class="form-select" onchange="filterPersonnel()">
@@ -58,16 +66,19 @@
             </select>
           </div>
 
-          <div class="mb-3">
+          <!-- Personnel Selection (optional) -->
+          <div class="mb-3" id="personnel-wrapper">
             <label class="form-label">Select Personnel (optional)</label>
             <div id="personnel-container" class="d-flex flex-column border rounded p-3" style="max-height:200px; overflow-y:auto;"></div>
             <small class="text-muted">You may select multiple personnel.</small>
           </div>
 
+          <!-- Month -->
           <div class="mb-3">
             <label for="month" class="form-label">Select Month</label>
             <input type="month" name="month" id="month" class="form-control" required>
           </div>
+
         </div>
         <div class="modal-footer">
           <button type="submit" class="btn btn-success px-4">
@@ -79,11 +90,8 @@
   </div>
 </div>
 
-
-
-
 <!-- ======= REPORTS TABLE ======= -->
-<div class="table-responsive">
+<div class="table-responsive mt-3">
   <table class="table align-middle table-hover request-table">
     <thead class="table-light">
       <tr>
@@ -94,7 +102,7 @@
         <th>Personnel</th>
         <th>Status</th>
         <th>Rating</th>
-        <th>Success Indicator</th> <!-- New column -->
+        <th>Success Indicator</th>
         <th>Source</th>
       </tr>
     </thead>
@@ -120,33 +128,7 @@
               <span class="badge bg-light text-dark border me-1">{{ p }}</span>
             {% endfor %}
           </td>
-
-
-          <td>
-              <span class="status-badge
-                  {% if report.status == 'Pending' %} pending
-                  {% elif report.status == 'Approved' %} approved
-                  {% elif report.status == 'In Progress' %} in-progress
-                  {% elif report.status == 'Done for Review' %} done-review
-                  {% elif report.status == 'Completed' %} completed
-                  {% elif report.status == 'Cancelled' %} cancelled
-                  {% elif report.status == 'Emergency' %} emergency
-                  {% endif %}">
-
-                  {% if report.is_emergency %}
-                    <span>
-                      <img src="{% static 'images/emergency.png' %}" 
-                          alt="Emergency" 
-                          class="status-emergency-icon">
-                    </span>
-                  {% endif %}
-                  
-                  {{ report.status|default:"Completed" }}
-              </span>
-          </td>
-
-
-
+          <td><span class="badge bg-info text-dark">{{ report.status|default:"Completed" }}</span></td>
           <td>{{ report.rating|default:"Not Rated" }}</td>
           <td>
             {% if report.type == "WorkAccomplishmentReport" %}
@@ -171,7 +153,6 @@
   </table>
 </div>
 
-
 <!-- ======= PERSONNEL JSON ======= -->
 {{ personnel_list|json_script:"personnel-data" }}
 
@@ -179,6 +160,7 @@
 const personnelList = JSON.parse(document.getElementById('personnel-data').textContent);
 const personnelData = {};
 
+// Prepare personnel grouped by unit
 personnelList.forEach(p => {
   const unit = p.unit || 'unassigned';
   if (!personnelData[unit]) personnelData[unit] = [];
@@ -189,7 +171,9 @@ personnelList.forEach(p => {
 });
 
 const personnelContainer = document.getElementById('personnel-container');
+const personnelWrapper = document.getElementById('personnel-wrapper');
 
+// Filter personnel based on selected unit
 function filterPersonnel() {
   const selectedUnit = document.getElementById('unit').value || '';
   personnelContainer.innerHTML = "";
@@ -212,6 +196,13 @@ function filterPersonnel() {
   });
 }
 
+// Toggle personnel selection visibility depending on report type
+function togglePersonnelSelection() {
+  const reportType = document.getElementById('report_type').value;
+  personnelWrapper.style.display = reportType === 'ipmt' ? 'block' : 'none';
+}
+
+// Fetch WAR description dynamically
 async function fetchWarDescription(warId, retries = 15) {
   if (retries <= 0) return;
   try {
@@ -227,8 +218,10 @@ async function fetchWarDescription(warId, retries = 15) {
   }
 }
 
+// Initialize
 document.addEventListener('DOMContentLoaded', () => {
   filterPersonnel();
+  togglePersonnelSelection();
   {% for report in reports %}
     {% if report.type == "WorkAccomplishmentReport" %}
       fetchWarDescription({{ report.id }});
@@ -236,19 +229,5 @@ document.addEventListener('DOMContentLoaded', () => {
   {% endfor %}
 });
 </script>
+
 {% endblock %}
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-

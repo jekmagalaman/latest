@@ -4,7 +4,6 @@ from django.core.exceptions import ValidationError
 from django.conf import settings
 
 
-
 class Position(models.Model):
     name = models.CharField(max_length=100, unique=True)
 
@@ -17,10 +16,6 @@ class EmploymentStatus(models.Model):
 
     def __str__(self):
         return self.employment_status
-
-
-
-
 
 
 
@@ -42,12 +37,6 @@ class Department(models.Model):
 
     def __str__(self):
         return self.name
-
-
-
-
-
-
 
 
 class User(AbstractUser):
@@ -100,16 +89,26 @@ class User(AbstractUser):
         if self.role == "requestor" and not self.department:
             raise ValidationError("Requestor accounts must belong to a department.")
 
-        # ✅ ALL users must have a position and employment status
-        if not self.position:
-            raise ValidationError("All users must have a position assigned.")
+        # ===========================
+        # POSITION & EMPLOYMENT RULES
+        # ===========================
 
-        if not self.employment_status:
-            raise ValidationError("All users must have an employment status assigned.")
+        # ❌ Requestor and Director MUST NOT have position/employment_status
+        if self.role in ["requestor", "director"]:
+            if self.position or self.employment_status:
+                raise ValidationError(f"{self.get_role_display()} should not have a position or employment status assigned.")
+
+        # ✅ All OTHER roles MUST have both
+        else:
+            if not self.position:
+                raise ValidationError(f"{self.get_role_display()} must have a position assigned.")
+            if not self.employment_status:
+                raise ValidationError(f"{self.get_role_display()} must have an employment status assigned.")
 
         # Name requirement for main roles
         if self.role in ["director", "gso", "unit_head", "personnel"] and (not self.first_name or not self.last_name):
             raise ValidationError(f"{self.get_role_display()} accounts must have a first and last name.")
+
 
 
     def __str__(self):
@@ -121,4 +120,5 @@ class User(AbstractUser):
         if self.employment_status:
             details += f" [{self.employment_status.employment_status}]"
         return details
+
 

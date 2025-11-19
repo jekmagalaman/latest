@@ -1,0 +1,6 @@
+* Make error messages more visible */
+.errorlist li {
+    color: #b30000;
+    font-weight: bold;
+    padding: 4px 0;
+}

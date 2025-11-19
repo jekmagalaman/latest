@@ -38,10 +38,9 @@
             <p><strong>Requestor:</strong> {{ req.custom_full_name }}</p>
             <p><strong>Department:</strong> {{ req.requestor.department }}</p>
             <p><strong>Attachment:</strong><br>
-              {% if req.attachment %}
-                <a href="{{ req.attachment.url }}" target="_blank">
-                  <img src="{{ req.attachment.url }}" alt="Attachment"
-                       style="max-width: 220px; border-radius: 8px; cursor: pointer;">
+              {% if req.attachment_link %}
+                <a href="{{ req.attachment_link }}" target="_blank" class="text-decoration-none">
+                  <i class="bi bi-paperclip me-1"></i> Open Attachment
                 </a>
               {% else %}
                 <span class="text-muted">No attachment provided.</span>

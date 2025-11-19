@@ -1,0 +1,197 @@
+{% extends "gso_office/gso_base_dashboard.html" %}
+{% block title %}WAR Preview{% endblock %}
+
+{% block page_header %}
+<h1 class="page-title mb-0">Work Accomplishment Report Preview</h1>
+{% endblock %}
+
+{% block main_content %}
+
+<div class="header d-flex align-items-center justify-content-between mb-3">
+    <h1 class="page-title">WAR Preview - {{ month_filter }}</h1>
+    <div class="btn-group">
+        <button id="edit-btn" class="btn btn-warning" {% if reports|length == 0 %}disabled{% endif %}>Edit</button>
+        <button id="accept-btn" class="btn btn-success" {% if reports|length == 0 %}disabled{% endif %}>Export</button>
+        <button id="save-btn" class="btn btn-primary d-none">Save</button>
+        <button id="cancel-btn" class="btn btn-secondary d-none">Cancel</button>
+    </div>
+</div>
+
+<div class="table-responsive">
+  <table class="table align-middle table-hover request-table" id="war-table">
+    <thead class="table-light">
+      <tr>
+        <th>Date</th>
+        <th>Unit</th>
+        <th>Description</th>
+        <th>Requesting Office</th>
+        <th>Personnel</th>
+        <th>Status</th>
+        <th>Rating</th>
+        <th>Success Indicator</th>
+        <th>Source</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% if reports %}
+        {% for report in reports %}
+        <tr data-war-id="{{ report.id }}">
+          <td>{{ report.date|date:"Y-m-d" }}</td>
+          <td>{{ report.unit|title }}</td>
+          <td>
+            <span class="desc-text">{{ report.description }}</span>
+            <input class="desc-input form-control d-none" type="text" value="{{ report.description }}">
+          </td>
+          <td>{{ report.requesting_office }}</td>
+          <td>
+            {% for p in report.personnel %}
+              <span class="badge bg-light text-dark border me-1">{{ p }}</span>
+            {% endfor %}
+          </td>
+          <td>{{ report.status|default:"Completed" }}</td>
+          <td>{{ report.rating|default:"Not Rated" }}</td>
+          <td>{{ report.success_indicator.code|default:"Pending" }}</td>
+          <td>
+            {% if report.request %}
+              <span class="badge bg-success">Live</span>
+            {% else %}
+              <span class="badge bg-secondary">Migrated</span>
+            {% endif %}
+          </td>
+        </tr>
+        {% endfor %}
+      {% else %}
+        <tr><td colspan="9" class="text-center text-muted py-4">No reports available.</td></tr>
+      {% endif %}
+    </tbody>
+  </table>
+</div>
+
+<script>
+document.addEventListener("DOMContentLoaded", function() {
+    const editBtn = document.getElementById("edit-btn");
+    const acceptBtn = document.getElementById("accept-btn");
+    const saveBtn = document.getElementById("save-btn");
+    const cancelBtn = document.getElementById("cancel-btn");
+    const table = document.getElementById("war-table");
+    let rows = table.querySelectorAll("tbody tr");
+    let editMode = false;
+    let originalData = [];
+
+    function enterEditMode() {
+        editMode = true;
+        originalData = [];
+        rows.forEach(row => {
+            const descInput = row.querySelector(".desc-input");
+            const descText = row.querySelector(".desc-text");
+            if (!descInput) return;
+            originalData.push(descInput.value);
+            descText.classList.add("d-none");
+            descInput.classList.remove("d-none");
+        });
+        editBtn.classList.add("d-none");
+        acceptBtn.classList.add("d-none");
+        saveBtn.classList.remove("d-none");
+        cancelBtn.classList.remove("d-none");
+    }
+
+    function exitEditMode() {
+        editMode = false;
+        rows.forEach((row, index) => {
+            const descInput = row.querySelector(".desc-input");
+            const descText = row.querySelector(".desc-text");
+            if (!descInput) return;
+            descText.textContent = descInput.value;
+            descText.classList.remove("d-none");
+            descInput.classList.add("d-none");
+        });
+        editBtn.classList.remove("d-none");
+        acceptBtn.classList.remove("d-none");
+        saveBtn.classList.add("d-none");
+        cancelBtn.classList.add("d-none");
+    }
+
+    editBtn?.addEventListener("click", enterEditMode);
+
+    cancelBtn?.addEventListener("click", function() {
+        rows.forEach((row, index) => {
+            const descInput = row.querySelector(".desc-input");
+            if (!descInput) return;
+            descInput.value = originalData[index];
+        });
+        exitEditMode();
+    });
+
+    saveBtn?.addEventListener("click", async function() {
+        const payload = [];
+        rows.forEach(row => {
+            const descInput = row.querySelector(".desc-input");
+            if (!descInput) return;
+            payload.push({
+                war_id: parseInt(row.dataset.warId),
+                description: descInput.value.trim()
+            });
+        });
+
+        const response = await fetch("{% url 'gso_reports:save_war' %}", {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json",
+                "X-CSRFToken": "{{ csrf_token }}"
+            },
+            body: JSON.stringify({
+                month: "{{ month_filter }}",
+                unit: "{{ unit_filter }}",
+                rows: payload
+            })
+        });
+
+        if (response.ok) {
+            alert("WAR saved successfully!");
+            exitEditMode();
+        } else {
+            alert("Error saving WAR.");
+        }
+    });
+
+    acceptBtn?.addEventListener("click", async function() {
+        const payload = [];
+        rows.forEach(row => {
+            const descInput = row.querySelector(".desc-input");
+            const desc = descInput ? descInput.value.trim() : row.querySelector(".desc-text").textContent.trim();
+            payload.push({
+                war_id: parseInt(row.dataset.warId),
+                description: desc
+            });
+        });
+
+        const response = await fetch("{% url 'gso_reports:generate_war' %}", {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json",
+                "X-CSRFToken": "{{ csrf_token }}"
+            },
+            body: JSON.stringify({
+                month: "{{ month_filter }}",
+                unit: "{{ unit_filter }}",
+                rows: payload
+            })
+        });
+
+        if (!response.ok) {
+            alert("Failed to generate WAR Excel.");
+            return;
+        }
+
+        const blob = await response.blob();
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = `WAR_{{ unit_filter }}_{{ month_filter }}.xlsx`;
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+    });
+});
+</script>
+{% endblock %}

@@ -79,40 +79,37 @@ def account_management(request):
 # -------------------------------
 @login_required
 def requestor_account(request):
-    return render(request, "requestor/requestor_account/requestor_account.html")
-
-
-@login_required
-def requestor_profile(request):
     user = request.user
 
-    if request.method == 'POST':
-        # Update email if changed
-        email = request.POST.get('email', '').strip()
-        if email and email != user.email:
-            user.email = email
-            user.save()
-            messages.success(request, "✅ Email updated successfully.")
+    if request.method == "POST":
+        current_password = request.POST.get("current_password", "")
+        new_password = request.POST.get("new_password", "")
+        confirm_password = request.POST.get("confirm_password", "")
 
-        # Handle password change
-        current_password = request.POST.get('current_password')
-        new_password = request.POST.get('new_password')
-        confirm_password = request.POST.get('confirm_password')
+        if not (current_password and new_password and confirm_password):
+            messages.error(request, "⚠️ Please fill all password fields.")
+            return redirect("gso_accounts:requestor_account")
 
-        if current_password and new_password and confirm_password:
-            if not user.check_password(current_password):
-                messages.error(request, "❌ Incorrect current password.")
-            elif new_password != confirm_password:
-                messages.error(request, "⚠️ New passwords do not match.")
-            else:
-                user.set_password(new_password)
-                user.save()
-                update_session_auth_hash(request, user)
-                messages.success(request, "🔒 Password updated successfully.")
+        if not user.check_password(current_password):
+            messages.error(request, "❌ Incorrect current password.")
+            return redirect("gso_accounts:requestor_account")
 
-        return redirect('requestor_profile')
+        if new_password != confirm_password:
+            messages.error(request, "⚠️ New passwords do not match.")
+            return redirect("gso_accounts:requestor_account")
 
-    return render(request, 'requestor/requestor_account/requestor_account.html', {'user': user})
+        if len(new_password) < 8:
+            messages.error(request, "⚠️ Password must be at least 8 characters.")
+            return redirect("gso_accounts:requestor_account")
+
+        user.set_password(new_password)
+        user.save()
+        update_session_auth_hash(request, user)
+        messages.success(request, "🔒 Password updated successfully.")
+        return redirect("gso_accounts:requestor_account")
+
+    return render(request, "requestor/requestor_account/requestor_account.html", {"user": user})
+
 
 
 @login_required
@@ -338,10 +335,9 @@ def add_user(request):
     if request.method == "POST":
         form = UserForm(request.POST)
         if form.is_valid():
-            user = form.save(commit=False)
-            user.password = make_password(form.cleaned_data["password"])
-            user.save()
+            form.save()   # <-- no need for make_password or commit=False
             return redirect("gso_accounts:account_management")
     else:
         form = UserForm()
+
     return render(request, "gso_office/accounts/add_user.html", {"form": form})

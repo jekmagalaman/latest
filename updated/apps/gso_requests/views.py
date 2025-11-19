@@ -9,7 +9,9 @@ from .models import ServiceRequest, RequestMaterial, Unit, TaskReport, Feedback
 from apps.gso_accounts.models import User
 from apps.gso_inventory.models import InventoryItem
 from .utils import filter_requests, get_unit_inventory, create_war_from_request, notify_users
+from utils.drive_upload import upload_file_to_drive  # import the uploader
 from apps.gso_reports.models import WorkAccomplishmentReport, SuccessIndicator
+from django.conf import settings
 from django.db import transaction
 
 # -------------------------------
@@ -501,7 +503,6 @@ def personnel_task_detail(request, pk):
 
 
 
-
 @login_required
 def personnel_history(request):
     history = ServiceRequest.objects.filter(assigned_personnel=request.user, status="Completed").order_by("-created_at")
@@ -558,9 +559,6 @@ def requestor_request_management(request):
     })
 
 
-
-
-
 @login_required
 @user_passes_test(is_requestor)
 def add_request(request):
@@ -569,6 +567,17 @@ def add_request(request):
         labor = request.POST.get("labor") == "1"
         materials = request.POST.get("materials") == "1"
         others = request.POST.get("others") == "1"
+
+        file = request.FILES.get("attachment")
+        attachment_link = None
+
+        if file:
+            # Use folder ID from settings
+            attachment_link = upload_file_to_drive(
+                file,
+                file.name,
+                folder_id=settings.SHARED_DRIVE_FOLDER_ID
+            )
 
         ServiceRequest.objects.create(
             requestor=request.user,
@@ -579,9 +588,7 @@ def add_request(request):
             custom_full_name=request.POST.get("custom_full_name") or "",
             custom_email=request.POST.get("custom_email") or "",
             custom_contact_number=request.POST.get("custom_contact_number") or "",
-            attachment=request.FILES.get("attachment"),
-
-            # NEW FIELDS
+            attachment_link=attachment_link,
             labor=labor,
             materials_needed=materials,
             others_needed=others,
@@ -589,16 +596,6 @@ def add_request(request):
 
         return redirect("gso_requests:requestor_request_management")
     
-
-
-
-
-
-
-
-    
-
-
 @login_required
 @user_passes_test(is_requestor)
 def cancel_request(request, pk):

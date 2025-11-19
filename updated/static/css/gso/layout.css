@@ -26,6 +26,7 @@
   display: flex;
   justify-content: space-between;
   align-items: center;
+  flex-wrap: wrap; /* allows items to move on mobile */
 }
 
 .page-title {
@@ -35,21 +36,9 @@
   color: #fff;
 }
 
+/* Inputs / Filter */
 .header input.form-control-sm,
 .header select.form-select-sm {
   min-width: 160px;
 }
-
-
-
-/* Mobile adjustments */
-@media (max-width: 768px) {
-  .main-content {
-    margin-left: 0;     /* full width */
-    padding: 20px;      /* optional smaller padding */
-    height: 100vh;
-    overflow-y: auto;   /* scroll only main content */
-  }
-}
-
 

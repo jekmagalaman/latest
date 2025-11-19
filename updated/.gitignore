@@ -1,0 +1,2 @@
+# Ignore Google Service Account credentials
+core/credentials.json

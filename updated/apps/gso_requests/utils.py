@@ -79,13 +79,10 @@ def create_war_from_request(request):
         war.assigned_personnel.set(request.assigned_personnel.all())
 
     # ✅ Ensure WAR has a Success Indicator placeholder
-    if not hasattr(war, "success_indicator") or war.success_indicator is None:
-        indicator, _ = SuccessIndicator.objects.get_or_create(
-            name="Pending Review",
-            defaults={"description": "To be defined by assigned personnel or GSO office."},
-        )
-        war.success_indicator = indicator
-        war.save(update_fields=["success_indicator"])
+    if war.success_indicator is None:
+        war.status = "Pending"
+        war.save(update_fields=["status"])
+
 
     # ---------------------------
     # Generate AI description asynchronously

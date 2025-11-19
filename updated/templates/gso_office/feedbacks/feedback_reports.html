@@ -5,19 +5,25 @@
 
 {% block main_content %}
 <div class="container mt-4">
+
+  <!-- HEADER -->
   <div class="d-flex justify-content-between align-items-center mb-3">
     <h4>📋 Client Satisfaction Feedbacks</h4>
-    <a href="?export=true" class="btn btn-success">
+
+    <!-- OPEN MODAL BUTTON -->
+    <button class="btn btn-success" data-bs-toggle="modal" data-bs-target="#csvModal">
       <i class="bi bi-download"></i> Download CSV
-    </a>
+    </button>
   </div>
 
+  <!-- TABLE -->
   <div class="table-responsive">
     <table class="table table-bordered table-hover align-middle">
       <thead class="table-light">
         <tr>
           <th>#</th>
           <th>Request ID</th>
+          <th>Unit</th>
           <th>Requestor Name</th>
           <th>Requestor Email</th>
           <th>Average Rating</th>
@@ -25,13 +31,23 @@
           <th>Date Submitted</th>
         </tr>
       </thead>
+
       <tbody>
         {% for fb in feedback_list %}
         <tr>
           <td>{{ forloop.counter }}</td>
           <td>{{ fb.request.id }}</td>
 
-          <!-- ✅ Requestor Name (prefers custom_full_name if available) -->
+          <!-- UNIT -->
+          <td>
+            {% if fb.request.unit %}
+              {{ fb.request.unit.name }}
+            {% else %}
+              —
+            {% endif %}
+          </td>
+
+          <!-- NAME -->
           <td>
             {% if fb.request.custom_full_name %}
               {{ fb.request.custom_full_name }}
@@ -42,7 +58,7 @@
             {% endif %}
           </td>
 
-          <!-- ✅ Requestor Email (prefers custom_email if available) -->
+          <!-- EMAIL -->
           <td>
             {% if fb.request.custom_email %}
               {{ fb.request.custom_email }}
@@ -53,22 +69,87 @@
             {% endif %}
           </td>
 
-          <!-- ✅ Average Rating -->
           <td>{{ fb.average_rating|default:"0.00" }}</td>
-
-          <!-- ✅ Suggestions -->
           <td>{{ fb.suggestions|default:"—" }}</td>
-
-          <!-- ✅ Date Submitted -->
           <td>{{ fb.date_submitted|date:"Y-m-d H:i" }}</td>
         </tr>
+
         {% empty %}
         <tr>
-          <td colspan="7" class="text-center text-muted">No feedback submissions yet.</td>
+          <td colspan="8" class="text-center text-muted">No feedback submissions yet.</td>
         </tr>
         {% endfor %}
       </tbody>
     </table>
   </div>
 </div>
+
+<!-- CSV EXPORT MODAL -->
+<div class="modal fade" id="csvModal" tabindex="-1">
+  <div class="modal-dialog">
+    <form class="modal-content" method="GET">
+
+      <div class="modal-header">
+        <h5 class="modal-title">Export Feedback CSV</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+
+      <div class="modal-body">
+
+        <!-- UNIT DROPDOWN -->
+        <div class="mb-3">
+          <label class="form-label">Select Unit</label>
+          <select class="form-select" name="unit_id">
+            <option value="">All Units</option>
+            {% for unit in units %}
+            <option value="{{ unit.id }}">{{ unit.name }}</option>
+            {% endfor %}
+          </select>
+        </div>
+
+        <!-- FILTER TYPE -->
+        <div class="mb-3">
+          <label class="form-label">Filter Type</label>
+          <select id="filterType" class="form-select">
+            <option value="month">Single Month</option>
+            <option value="range">Date Range</option>
+          </select>
+        </div>
+
+        <!-- SINGLE MONTH -->
+        <div id="monthFilter" class="mb-3">
+          <label class="form-label">Select Month</label>
+          <input type="month" name="month" class="form-control">
+        </div>
+
+        <!-- DATE RANGE -->
+        <div id="rangeFilter" class="mb-3" style="display: none;">
+          <label class="form-label">From</label>
+          <input type="date" name="start_date" class="form-control mb-2">
+
+          <label class="form-label">To</label>
+          <input type="date" name="end_date" class="form-control">
+        </div>
+
+      </div>
+
+      <div class="modal-footer">
+        <button type="submit" name="export" value="true" class="btn btn-success">
+          <i class="bi bi-download"></i> Export CSV
+        </button>
+      </div>
+
+    </form>
+  </div>
+</div>
+
+<!-- Script for toggling filter UI -->
+<script>
+document.getElementById("filterType").addEventListener("change", function () {
+  const type = this.value;
+  document.getElementById("monthFilter").style.display = type === "month" ? "block" : "none";
+  document.getElementById("rangeFilter").style.display = type === "range" ? "block" : "none";
+});
+</script>
+
 {% endblock %}

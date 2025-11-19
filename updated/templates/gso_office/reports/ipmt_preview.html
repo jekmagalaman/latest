@@ -143,14 +143,13 @@ document.addEventListener("DOMContentLoaded", function() {
             const descInput = row.querySelector(".desc-input");
             const remarksInput = row.querySelector(".remarks-input");
 
+            // Extract ONLY the pure indicator code
             const code = row.querySelector("[data-indicator-code]").dataset.indicatorCode.trim();
-            const desc = row.querySelector(".text-muted").textContent.trim();
-            const combinedIndicator = `${code} - ${desc}`;  // CLEAN, NO EXTRA SPACES
 
             if (!descInput) return;
 
             payload.push({
-                indicator: combinedIndicator,
+                indicator: code,  // <-- ONLY CODE, NO DESCRIPTION
                 description: descInput.value.trim(),
                 remarks: remarksInput.value.trim(),
                 war_ids: row.dataset.warIds.split(",").filter(Boolean).map(Number)

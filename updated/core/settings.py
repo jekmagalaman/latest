@@ -57,7 +57,34 @@ INSTALLED_APPS = [
 
     'channels',
 
+    'auditlog',
+
+    #lex dito binago ko
+    'rest_framework',
+
 ]
+
+
+#lex pati ito
+REST_FRAMEWORK = {
+    'DEFAULT_PERMISSION_CLASSES': [
+        'rest_framework.permissions.IsAuthenticated',
+    ],
+    'DEFAULT_AUTHENTICATION_CLASSES': [
+        'rest_framework.authentication.SessionAuthentication',
+        'rest_framework.authentication.BasicAuthentication',
+        'rest_framework.authentication.TokenAuthentication',
+    ],
+    'DEFAULT_PAGINATION_CLASS': 'rest_framework.pagination.PageNumberPagination',
+    'PAGE_SIZE': 10
+}
+
+
+
+
+
+
+
 
 
 MIDDLEWARE = [
@@ -68,6 +95,7 @@ MIDDLEWARE = [
     'django.contrib.auth.middleware.AuthenticationMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
+    'auditlog.middleware.AuditlogMiddleware',
 ]
 
 ROOT_URLCONF = 'core.urls'
@@ -201,6 +229,8 @@ LOGOUT_REDIRECT_URL = '/gso_accounts/login/'
 
 
 HF_API_KEY = os.getenv("HUGGINGFACE_API_TOKEN")
+
+SHARED_DRIVE_FOLDER_ID = "0ANI03GsWzu3gUk9PVA"
 
 #CELERY_BROKER_URL = 'redis://localhost:6379/0'  # Redis local
 #CELERY_RESULT_BACKEND = 'redis://localhost:6379/0'

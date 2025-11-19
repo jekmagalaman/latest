@@ -1,0 +1,14 @@
+# Ensure JSON files keep LF endings
+*.json text eol=lf
+
+# Ensure Python files keep LF endings
+*.py text eol=lf
+
+# Ensure text files in general
+*.txt text eol=lf
+
+# Binary files should not be converted
+*.png binary
+*.jpg binary
+*.pdf binary
+*.zip binary
