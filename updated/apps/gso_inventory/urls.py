@@ -12,6 +12,7 @@ urlpatterns = [
 
     # Unit Head
     path('unit-head/inventory/', views.unit_head_inventory, name='unit_head_inventory'),
+    path("unit-head/inventory/add/", views.unit_head_add_material, name="unit_head_add_material"),
 
     # Personnel
     path('personnel/', views.personnel_inventory, name='personnel_inventory'),

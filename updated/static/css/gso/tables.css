@@ -50,8 +50,8 @@
 
 .table tbody tr:hover {
   background-color: #f9fafb;
-  transform: translateY(-3px);
-  box-shadow: 0 4px 12px rgba(0, 46, 114, 0.2);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 5px rgba(128, 128, 128, 0.5);
   position: relative;
   z-index: 1;
 }

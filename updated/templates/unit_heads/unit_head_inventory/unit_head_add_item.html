@@ -1,0 +1,25 @@
+{% extends "unit_heads/unit_head_base_dashboard.html" %}
+
+{% block title %}Add Material{% endblock %}
+
+{% block page_header %}
+<h1 class="page-title mb-0">Add Material – {{ unit.name }}</h1>
+{% endblock %}
+
+{% block main_content %}
+
+<div class="card mt-3">
+  <div class="card-body">
+    <form method="POST" action="">
+      {% csrf_token %}
+      {{ form.as_p }}
+
+      <div class="d-flex gap-2">
+        <button type="submit" class="btn btn-success">Add Material</button>
+        <a href="{% url 'gso_inventory:unit_head_inventory' %}" class="btn btn-secondary">Cancel</a>
+      </div>
+    </form>
+  </div>
+</div>
+
+{% endblock %}

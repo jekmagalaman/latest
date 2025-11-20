@@ -3,9 +3,12 @@ from django.shortcuts import render, get_object_or_404, redirect
 from django.contrib.auth.decorators import login_required, user_passes_test
 from django.contrib import messages
 from django.utils import timezone
+from datetime import datetime
+from django.utils.dateparse import parse_datetime
 from django.http import HttpResponseForbidden, JsonResponse
+from django.core.exceptions import ValidationError
 
-from .models import ServiceRequest, RequestMaterial, Unit, TaskReport, Feedback
+from .models import ServiceRequest, RequestMaterial, Unit, TaskReport, Feedback, MotorpoolRequest, Vehicle, Department, FuelPurchaseOrder, FuelPurchaseLineItem, FuelProduct
 from apps.gso_accounts.models import User
 from apps.gso_inventory.models import InventoryItem
 from .utils import filter_requests, get_unit_inventory, create_war_from_request, notify_users
@@ -23,13 +26,107 @@ def is_requestor(user): return user.is_authenticated and user.role == "requestor
 def is_director(user): return user.is_authenticated and user.role == "director"
 
 
+
+# -------------------------------
+# MOTORPOOL REQUEST CREATION
+# -------------------------------
+@login_required
+def add_motorpool_request(request):
+    if request.method == "POST":
+        # --- Get Unit ---
+        unit_id = request.POST.get("unit")
+        unit = get_object_or_404(Unit, id=unit_id)
+
+        # --- Create ServiceRequest ---
+        sr = ServiceRequest.objects.create(
+            requestor=request.user,
+            unit=unit,
+            department=request.user.department,  # <-- automatically set to requestor's department
+            description=request.POST.get("purpose") or "Motorpool Request",
+            labor=False,
+            materials_needed=False,
+            others_needed=False,
+            is_emergency=False
+        )
+
+        # --- Create MotorpoolRequest WITHOUT driver & vehicle ---
+        MotorpoolRequest.objects.create(
+            service_request=sr,
+            requesting_office=request.user.department,  # automatically set
+            purpose=request.POST.get("purpose"),
+            place_to_be_visited=request.POST.get("place_to_be_visited"),
+            trip_start=None,  # optional: will be set by unit head later
+            trip_end=None,
+            itinerary=request.POST.get("itinerary"),
+            passengers_count=int(request.POST.get("passengers_count")) if request.POST.get("passengers_count") else None,
+            contact_no=request.POST.get("contact_no"),
+            contact_person=request.POST.get("contact_person"),
+            number_of_days=int(request.POST.get("number_of_days")) if request.POST.get("number_of_days") else None,
+        )
+
+        return redirect("gso_requests:requestor_request_management")
+
+    return redirect("gso_requests:requestor_request_management")
+# --------------------------------------
+# FUEL PURCHASE ORDER CREATION
+# --------------------------------------
+@login_required
+def create_fuel_po_request(request):
+    unit_id = request.GET.get("unit")
+    unit = get_object_or_404(Unit, id=unit_id)
+
+    if request.method == "POST":
+        # 1. Create base service request
+        sr = ServiceRequest.objects.create(
+            requestor=request.user,
+            unit=unit,
+            department=request.user.department,
+            description="Fuel Purchase Order",
+            labor=False,
+            materials_needed=False,
+            others_needed=False,
+        )
+
+        # 2. Create the PO header
+        po = FuelPurchaseOrder.objects.create(
+            service_request=sr,
+            requesting_office_id=request.POST.get("requesting_office"),
+            purpose=request.POST.get("purpose"),
+            driver_or_official=request.POST.get("driver_or_official"),
+            vehicle_plate=request.POST.get("vehicle_plate"),
+        )
+
+        # 3. Create line items
+        for product in FuelProduct.values:
+            FuelPurchaseLineItem.objects.create(
+                po=po,
+                product=product,
+                qty_words=request.POST.get(f"qty_words_{product}", ""),
+                qty_figure=request.POST.get(f"qty_figure_{product}", 0),
+                amount=request.POST.get(f"amount_{product}", 0),
+            )
+
+        return redirect("requestor_dashboard")
+
+    departments = Department.objects.all()
+
+    return render(request, "requestor/fuel_po_form.html", {
+        "unit": unit,
+        "departments": departments,
+    })
+
+
+
+
 # -------------------------------
 # Request Management Views (single template)
 # -------------------------------
 @login_required
 def request_management(request):
-    requests_qs = ServiceRequest.objects.select_related("requestor", "unit").prefetch_related("assigned_personnel").order_by("-is_emergency", "-created_at")
-
+    # Fetch requests with related info
+    requests_qs = ServiceRequest.objects.select_related(
+        "requestor", "unit", "selected_indicator"  # <-- add selected_indicator
+    ).prefetch_related("assigned_personnel").order_by("-is_emergency", "-created_at")
 
     # Apply filters
     requests_qs = filter_requests(
@@ -40,6 +137,10 @@ def request_management(request):
 
     units = Unit.objects.all()
 
+    # Fetch success indicators as a list of dicts for JS
+    indicators_qs = SuccessIndicator.objects.all()
+    indicators = list(indicators_qs.values("id", "code", "description"))
+
     # Pass user role to template for role-specific buttons
     user_role = request.user.role
 
@@ -49,7 +150,9 @@ def request_management(request):
         "search_query": request.GET.get("q"),
         "unit_filter": request.GET.get("unit"),
         "user_role": user_role,  # for template role checks
+        "indicators": indicators,  # <-- send indicators to template
     })
+
 
 @login_required
 @user_passes_test(is_director)
@@ -83,6 +186,31 @@ def approve_request(request, pk):
     return redirect("gso_requests:request_management")
 
 
+@login_required
+def update_success_indicator(request, pk):
+    req = get_object_or_404(ServiceRequest, pk=pk)
+
+    # Only allow update if user is allowed
+    if request.user.role not in ["director", "gso"] and not (
+        request.user.role == "personnel" and req.status == "In Progress"
+    ):
+        return HttpResponseForbidden("You are not allowed to update this request.")
+
+    if request.method == "POST":
+        selected_id = request.POST.get("selected_indicator")
+        if selected_id:
+            try:
+                indicator = SuccessIndicator.objects.get(pk=selected_id)
+                req.selected_indicator = indicator
+            except SuccessIndicator.DoesNotExist:
+                req.selected_indicator = None
+        else:
+            req.selected_indicator = None
+
+        req.save()
+        messages.success(request, "Success Indicator updated successfully.")
+        return redirect("gso_requests:request_management")
+
 
 
 
@@ -105,7 +233,6 @@ def unit_head_request_management(request):
         unit=request.user.unit
     ).exclude(status__in=["Completed", "Cancelled"]).order_by("-is_emergency", "-created_at")
 
-
     # Apply filters
     requests_qs = filter_requests(
         requests_qs,
@@ -113,20 +240,13 @@ def unit_head_request_management(request):
         status_filter=request.GET.get("status"),
     )
 
+    # --- Motorpool-specific flag for template ---
+    is_motorpool_unit = request.user.unit.name.lower() == "motorpool"
+
     return render(request, "unit_heads/unit_head_request_management/unit_head_request_management.html", {
-        "requests": requests_qs
+        "requests": requests_qs,
+        "is_motorpool_unit": is_motorpool_unit,  # Pass flag to template
     })
-
-
-
-
-
-
-
-
-
-
-
 
 
 @login_required
@@ -176,6 +296,10 @@ def unit_head_request_detail(request, pk):
 
         # === Save/Update Success Indicator ===
         if "save_success_indicator" in request.POST:
+            if service_request.status == "Completed":
+                messages.error(request, "❌ You cannot change the Success Indicator for a completed request.")
+                return redirect("gso_requests:unit_head_request_detail", pk=pk)
+
             si_id = request.POST.get("success_indicator")
             if si_id:
                 si = get_object_or_404(SuccessIndicator, id=si_id, unit=service_request.unit)
@@ -184,6 +308,7 @@ def unit_head_request_detail(request, pk):
                 messages.success(request, "✅ Success Indicator updated for this request.")
             else:
                 messages.warning(request, "⚠️ Please select a valid Success Indicator.")
+
             return redirect("gso_requests:unit_head_request_detail", pk=pk)
 
         # === Assign Personnel ===
@@ -232,13 +357,11 @@ def unit_head_request_detail(request, pk):
             messages.success(request, "✅ Material assignments saved successfully.")
             return redirect("gso_requests:unit_head_request_detail", pk=pk)
 
-        # === Schedule Request (NEW) ===
+        # === Schedule Request ===
         elif form_type == "schedule_request":
             start = request.POST.get("schedule_start") or None
             end = request.POST.get("schedule_end") or None
             remarks = request.POST.get("schedule_remarks") or ""
-
-            # Only convert non-empty strings to datetime
             from django.utils.dateparse import parse_datetime
             service_request.schedule_start = parse_datetime(start) if start else None
             service_request.schedule_end = parse_datetime(end) if end else None
@@ -248,6 +371,57 @@ def unit_head_request_detail(request, pk):
             messages.success(request, "✅ Schedule saved successfully!")
             return redirect("gso_requests:unit_head_request_detail", pk=pk)
 
+        # === Save All Assignments (Schedule + Personnel + Materials) ===
+        elif form_type == "save_all_assignments":
+            # --- Schedule ---
+            start = request.POST.get("schedule_start") or None
+            end = request.POST.get("schedule_end") or None
+            remarks = request.POST.get("schedule_remarks") or ""
+            from django.utils.dateparse import parse_datetime
+            service_request.schedule_start = parse_datetime(start) if start else None
+            service_request.schedule_end = parse_datetime(end) if end else None
+            service_request.schedule_remarks = remarks
+            service_request.save(update_fields=["schedule_start", "schedule_end", "schedule_remarks"])
+
+            # --- Assign Personnel ---
+            assigned_ids = request.POST.getlist("personnel_ids")
+            service_request.assigned_personnel.set(assigned_ids)
+            for pid in assigned_ids:
+                user = User.objects.get(pk=pid)
+                active_tasks = user.assigned_requests.filter(status__in=["Pending", "Approved", "In Progress"])
+                if active_tasks.exists():
+                    messages.warning(
+                        request,
+                        f"⚠️ {user.get_full_name()} is currently busy with {active_tasks.count()} task(s)."
+                    )
+
+            # --- Assign Materials ---
+            # Restore previously used materials
+            for rm in service_request.requestmaterial_set.all():
+                rm.material.quantity += rm.quantity
+                rm.material.save()
+            service_request.requestmaterial_set.all().delete()
+
+            material_ids = request.POST.getlist("material_ids")
+            for material_id in material_ids:
+                qty = request.POST.get(f"quantity_{material_id}")
+                if qty and int(qty) > 0:
+                    material = get_object_or_404(InventoryItem, pk=material_id, owned_by=service_request.unit)
+                    qty = int(qty)
+                    if material.quantity < qty:
+                        messages.error(request, f"❌ Not enough {material.name} in stock.")
+                        return redirect("gso_requests:unit_head_request_detail", pk=pk)
+
+                    material.quantity -= qty
+                    material.save()
+                    RequestMaterial.objects.create(
+                        request=service_request,
+                        material=material,
+                        quantity=qty
+                    )
+
+            messages.success(request, "✅ Schedule, personnel, and materials saved successfully.")
+            return redirect("gso_requests:unit_head_request_detail", pk=pk)
 
         # === Approve Completion (Generate WAR) ===
         elif action == "approve" and service_request.status == "Done for Review":
@@ -281,7 +455,6 @@ def unit_head_request_detail(request, pk):
         # === REMOVE EMERGENCY TAG ===
         elif action == "unset_emergency":
             service_request.is_emergency = False
-            # Restore status to Pending (or In Progress if you prefer)
             service_request.status = "Pending"
             service_request.save(update_fields=["is_emergency", "status"])
             messages.info(request, "❎ Emergency tag removed from this request.")
@@ -302,6 +475,7 @@ def unit_head_request_detail(request, pk):
         "war": war,
         "indicators": indicators,
     })
+
 
 
 
@@ -600,10 +774,20 @@ def add_request(request):
 @user_passes_test(is_requestor)
 def cancel_request(request, pk):
     req = get_object_or_404(ServiceRequest, pk=pk, requestor=request.user)
-    if req.status in ["Pending", "Approved"]:
-        req.status = "Cancelled"
-        req.save()
+
+    if request.method == "POST":
+        reason = request.POST.get("cancel_reason", "").strip()
+
+        if req.status in ["Pending", "Approved"]:
+            req.status = "Cancelled"
+            req.cancel_reason = reason
+            req.save()
+
+        return redirect("gso_requests:requestor_request_management")
+
+    # if GET → do not allow
     return redirect("gso_requests:requestor_request_management")
+
 
 
 @login_required
@@ -617,83 +801,6 @@ def requestor_request_history(request):
         "request_history": history
     })
 
-
-
-
-# -------------------------------
-# SUCCESS INDICATOR (Personnel + Unit Head)
-# -------------------------------
-
-@login_required
-def update_success_indicator_personnel(request, request_id):
-    """
-    Allow assigned personnel to propose/update a success indicator for their completed task.
-    """
-    service_request = get_object_or_404(ServiceRequest, id=request_id, assigned_personnel=request.user)
-    war = WorkAccomplishmentReport.objects.filter(request=service_request).first()
-
-    if not war:
-        messages.error(request, "No Work Accomplishment Report found for this request.")
-        return redirect("gso_requests:personnel_task_detail", pk=request_id)
-
-    if request.method == "POST":
-        name = request.POST.get("name", "").strip()
-        description = request.POST.get("description", "").strip()
-
-        if name:
-            indicator, _ = SuccessIndicator.objects.get_or_create(name=name)
-            if description:
-                indicator.description = description
-                indicator.save(update_fields=["description"])
-            war.success_indicator = indicator
-            war.save(update_fields=["success_indicator"])
-            messages.success(request, "Success Indicator updated successfully.")
-            return redirect("gso_requests:personnel_task_detail", pk=request_id)
-
-        messages.warning(request, "Indicator name is required.")
-
-    return render(request, "personnel/personnel_success_indicator_form.html", {
-        "task": service_request,
-        "war": war,
-    })
-
-
-@login_required
-def update_success_indicator_unit_head(request, request_id):
-    """
-    Allow Unit Head to review/update a success indicator for their unit’s request.
-    """
-    service_request = get_object_or_404(ServiceRequest, id=request_id)
-    war = WorkAccomplishmentReport.objects.filter(request=service_request).first()
-
-    if not war:
-        messages.error(request, "No Work Accomplishment Report found for this request.")
-        return redirect("gso_requests:unit_head_request_detail", pk=request_id)
-
-    # Restrict to same unit
-    if request.user.role != "unit_head" or service_request.unit != request.user.unit:
-        return HttpResponseForbidden("Not authorized to edit this indicator.")
-
-    if request.method == "POST":
-        name = request.POST.get("name", "").strip()
-        description = request.POST.get("description", "").strip()
-
-        if name:
-            indicator, _ = SuccessIndicator.objects.get_or_create(name=name)
-            if description:
-                indicator.description = description
-                indicator.save(update_fields=["description"])
-            war.success_indicator = indicator
-            war.save(update_fields=["success_indicator"])
-            messages.success(request, "Success Indicator updated successfully.")
-            return redirect("gso_requests:unit_head_request_detail", pk=request_id)
-
-        messages.warning(request, "Indicator name is required.")
-
-    return render(request, "unit_head/unit_head_success_indicator_form.html", {
-        "req": service_request,
-        "war": war,
-    })
 
 # -------------------------------
 # Feedback Views

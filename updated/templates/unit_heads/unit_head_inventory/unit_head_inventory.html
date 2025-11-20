@@ -2,9 +2,6 @@
 
 {% block title %}Inventory{% endblock %}
 
-
-
-
 <!-- ===== HEADER ===== -->
 {% block page_header %}
 <h1 class="page-title mb-0">Inventory – {{ unit.name }}</h1>
@@ -38,12 +35,13 @@
   </select>
 
   <button type="submit" class="btn btn-primary btn-sm">Search</button>
+
+  <!-- ADD MATERIAL LINK -->
+  <a href="{% url 'gso_inventory:unit_head_add_material' %}" class="btn btn-success btn-sm ms-2">
+    + Add Material
+  </a>
 </form>
 {% endblock %}
-
-
-
-
 
 {% block main_content %}
 
@@ -55,7 +53,7 @@
 {% else %}
 
 <!-- ======= INVENTORY TABLE ======= -->
-<div class="table-responsive">
+<div class="table-responsive mt-3">
   <table class="table align-middle table-hover request-table">
     <thead class="table-light">
       <tr>
@@ -87,6 +85,3 @@
 </div>
 {% endif %}
 {% endblock %}
-
-
-

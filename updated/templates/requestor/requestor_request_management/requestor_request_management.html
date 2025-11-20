@@ -127,9 +127,11 @@
       <button class="modal2-close-btn" onclick="closeModal2()">&times;</button>
     </div>
 
-    <form method="POST" action="{% url 'gso_requests:add_request' %}" enctype="multipart/form-data">
-      {% csrf_token %}
-      <div class="modal2-body">
+    <div class="modal2-body">
+
+      <!-- GENERIC FORM -->
+      <form id="genericForm" method="POST" action="{% url 'gso_requests:add_request' %}" enctype="multipart/form-data">
+        {% csrf_token %}
         <input type="hidden" name="unit" id="selectedUnit">
 
         <div class="modal2-category-section">
@@ -138,7 +140,6 @@
             <label><input type="checkbox" name="labor" value="1"> LABOR</label>
             <label><input type="checkbox" name="materials" value="1"> MATERIALS</label>
             <label><input type="checkbox" name="others" value="1"> OTHERS</label>
-
           </div>
         </div>
 
@@ -159,18 +160,49 @@
         <div class="modal2-attachments">
           <label class="modal2-label">Attachment</label>
           <input type="file" name="attachment" class="modal2-input" accept="image/*,application/pdf">
-          <small class="text-muted">
-            Your file will be uploaded automatically to Google Drive.
-          </small>
+          <small class="text-muted">Your file will be uploaded automatically to Google Drive.</small>
         </div>
 
         <div class="modal2-confirm">
           <button type="submit" class="modal2-confirm-btn">Submit Request</button>
         </div>
-      </div>
-    </form>
+      </form>
+
+      <!-- MOTORPOOL FORM -->
+      <form id="motorpoolForm" method="POST" action="{% url 'gso_requests:create_motorpool_request' %}" enctype="multipart/form-data" style="display:none;">
+        {% csrf_token %}
+        <input type="hidden" name="unit" id="selectedUnitMotorpool">
+
+        <div class="modal2-section">
+          <h3 class="modal2-section-title">Motorpool Request Details</h3>
+
+          <!-- Driver & Vehicle hidden from requestor -->
+          <input type="hidden" name="driver">
+          <input type="hidden" name="vehicle">
+
+          <!-- Requesting office hidden and automatically set in backend -->
+          <input type="hidden" name="requesting_office">
+
+          <textarea name="purpose" placeholder="Purpose/s" class="modal2-textarea"></textarea>
+          <input type="text" name="place_to_be_visited" placeholder="Place to be visited" class="modal2-input">
+          <textarea name="itinerary" placeholder="Itinerary of travel" class="modal2-textarea"></textarea>
+          <input type="number" name="passengers_count" placeholder="No. of passengers" class="modal2-input">
+          <input type="text" name="contact_no" placeholder="Contact Number" class="modal2-input">
+          <input type="text" name="contact_person" placeholder="Contact Person" class="modal2-input">
+          <input type="number" name="number_of_days" placeholder="No. of days" class="modal2-input">
+
+        </div>
+
+        <div class="modal2-confirm">
+          <button type="submit" class="modal2-confirm-btn">Submit Motorpool Request</button>
+        </div>
+      </form>
+
+    </div>
   </div>
 </div>
+
+
 
 <!-- Modal 3: View Request -->
 <div id="viewRequestModal" class="modal">
@@ -299,6 +331,25 @@
   </div>
 </div>
 
+<!-- Cancel Request Modal -->
+<div id="cancelModal" class="modal" style="display:none;">
+  <div class="modal-content p-4 rounded shadow-sm" style="max-width:500px;">
+    <h5 class="fw-bold">Cancel Request</h5>
+    <p>Please provide a reason for cancellation:</p>
+
+    <form id="cancelForm" method="POST">
+      {% csrf_token %}
+      <textarea name="cancel_reason" class="form-control" rows="3" required></textarea>
+
+      <div class="text-end mt-3">
+        <button type="button" class="btn btn-secondary" onclick="closeCancelModal()">Close</button>
+        <button type="submit" class="btn btn-danger">Confirm Cancel</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+
 <script>
   const modal = document.getElementById("requestModal");
   const formModal2 = document.getElementById("formModal2");
@@ -315,6 +366,22 @@
 
       formTitle.textContent = unitName + " Request Details";
       document.getElementById("selectedUnit").value = unitId;
+      document.getElementById("selectedUnitMotorpool").value = unitId;
+
+      // ✅ Show the appropriate form
+      if (unitName.toLowerCase() === "motorpool") {
+          document.getElementById("genericForm").style.display = "none";
+          document.getElementById("motorpoolForm").style.display = "block";
+
+          // Reset hidden fields
+          document.querySelector('#motorpoolForm [name="driver"]').value = "";
+          document.querySelector('#motorpoolForm [name="vehicle"]').value = "";
+          document.querySelector('#motorpoolForm [name="requesting_office"]').value = "";
+      } else {
+          document.getElementById("genericForm").style.display = "block";
+          document.getElementById("motorpoolForm").style.display = "none";
+      }
+
       modal.style.display = "none";
       formModal2.style.display = "flex";
     });
@@ -323,13 +390,19 @@
   backToModal1.onclick = () => {
     formModal2.style.display = "none";
     modal.style.display = "flex";
+    // Reset motorpool form to default
+    document.getElementById("motorpoolForm").reset();
+    document.getElementById("genericForm").reset();
   };
 
   function closeModal2() {
     formModal2.style.display = "none";
+    // Reset forms
+    document.getElementById("motorpoolForm").reset();
+    document.getElementById("genericForm").reset();
   }
 
-  // ✅ UPDATED openRequestModal to show categories
+  // ✅ View Request Modal
   function openRequestModal(id, unit, date, status, description, personnel, labor, materials, others) {
     document.getElementById("view-id").textContent = id;
     document.getElementById("view-unit").textContent = unit;
@@ -338,12 +411,10 @@
     document.getElementById("view-description").textContent = description;
     document.getElementById("view-personnel").textContent = personnel;
 
-    // Convert to booleans if needed
     labor = labor === "True" || labor === true;
     materials = materials === "True" || materials === true;
     others = others === "True" || others === true;
 
-    // Build category string
     const categories = [];
     if (labor) categories.push("Labor");
     if (materials) categories.push("Materials");
@@ -356,10 +427,9 @@
     if (status === "Pending" || status === "Approved") {
       let cancelUrl = "{% url 'gso_requests:cancel_request' 0 %}".replace("0", id);
       footer.innerHTML = `
-        <form method="post" action="${cancelUrl}" style="display:inline;">
-          {% csrf_token %}
-          <button type="submit" class="btn btn-sm btn-danger">Cancel Request</button>
-        </form>
+        <button class="btn btn-sm btn-danger" onclick="openCancelModal('${cancelUrl}')">
+          Cancel Request
+        </button>
       `;
     }
 
@@ -380,62 +450,61 @@
     document.getElementById("feedbackForm").reset();
   }
 
-  // ✅ Enhanced Feedback submission with icon + animation
+  function openCancelModal(url) {
+    const form = document.getElementById("cancelForm");
+    form.action = url;
+    document.getElementById("cancelModal").style.display = "flex";
+  }
+
+  function closeCancelModal() {
+    document.getElementById("cancelModal").style.display = "none";
+  }
+
+  // ✅ Enhanced Feedback submission
   document.getElementById("feedbackForm").addEventListener("submit", function(e) {
     e.preventDefault();
     const form = e.target;
     const formData = new FormData(form);
     const requestId = document.getElementById("feedbackRequestId").value;
 
-    fetch(form.action, {
-      method: "POST",
-      body: formData
-    })
-    .then(res => res.json())
-    .then(data => {
-      const btn = document.querySelector(`button[onclick="openFeedbackModal('${requestId}')"]`);
+    fetch(form.action, { method: "POST", body: formData })
+      .then(res => res.json())
+      .then(data => {
+        const btn = document.querySelector(`button[onclick="openFeedbackModal('${requestId}')"]`);
 
-      if (data.success) {
-        alert("✅ Thank you for your feedback!");
-        closeFeedbackModal();
-
-        if (btn) {
-          // Animation: fade-out → text/icon change → fade-in
-          btn.style.transition = "all 0.3s ease";
-          btn.style.opacity = "0.5";
-
-          setTimeout(() => {
+        if (data.success) {
+          alert("✅ Thank you for your feedback!");
+          closeFeedbackModal();
+          if (btn) {
+            btn.style.transition = "all 0.3s ease";
+            btn.style.opacity = "0.5";
+            setTimeout(() => {
+              btn.innerHTML = `<i class="bi bi-check-circle me-1"></i> Feedback Submitted`;
+              btn.classList.remove("btn-outline-success");
+              btn.classList.add("btn-secondary");
+              btn.disabled = true;
+              btn.style.opacity = "1";
+            }, 250);
+          }
+        } else if (data.already_submitted) {
+          alert("ℹ️ You have already submitted feedback for this request.");
+          closeFeedbackModal();
+          if (btn) {
             btn.innerHTML = `<i class="bi bi-check-circle me-1"></i> Feedback Submitted`;
             btn.classList.remove("btn-outline-success");
             btn.classList.add("btn-secondary");
             btn.disabled = true;
-            btn.style.opacity = "1";
-          }, 250);
+          }
+        } else {
+          alert("⚠️ Failed to submit feedback: " + (data.error || "Unknown error"));
+          console.error(data.error);
         }
-
-      } else if (data.already_submitted) {
-        alert("ℹ️ You have already submitted feedback for this request.");
-        closeFeedbackModal();
-
-        if (btn) {
-          btn.innerHTML = `<i class="bi bi-check-circle me-1"></i> Feedback Submitted`;
-          btn.classList.remove("btn-outline-success");
-          btn.classList.add("btn-secondary");
-          btn.disabled = true;
-        }
-
-      } else {
-        alert("⚠️ Failed to submit feedback: " + (data.error || "Unknown error"));
-        console.error(data.error);
-      }
-    })
-    .catch(err => {
-      console.error(err);
-      alert("⚠️ Network error. Please try again later.");
-    });
+      })
+      .catch(err => {
+        console.error(err);
+        alert("⚠️ Network error. Please try again later.");
+      });
   });
 </script>
-
-
 
 {% endblock %}

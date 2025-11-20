@@ -116,9 +116,6 @@ def accomplishment_report(request):
         {"reports": reports, "personnel_list": personnel_list},
     )
 
-# -------------------------------
-# 10/28/25 not edited below or walang kwenta
-# -------------------------------
 @login_required
 @user_passes_test(is_gso_or_director)
 @csrf_exempt  # allows AJAX POST from JS

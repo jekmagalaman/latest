@@ -1,5 +1,6 @@
 from django.db import models
 from django.conf import settings
+from django.utils import timezone
 from apps.gso_accounts.models import Unit, Department
 from apps.gso_inventory.models import InventoryItem
 from apps.gso_reports.models import SuccessIndicator 
@@ -66,6 +67,8 @@ class ServiceRequest(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
     completed_at = models.DateTimeField(null=True, blank=True)
 
+    cancel_reason = models.TextField(null=True, blank=True)
+
     # Assignment
     assigned_personnel = models.ManyToManyField(
         settings.AUTH_USER_MODEL,
@@ -105,6 +108,81 @@ class ServiceRequest(models.Model):
         if personnel.exists():
             return ", ".join([p.get_full_name() or p.username for p in personnel])
         return ""
+    
+
+# ----------------------------------------- #
+#   Motorpool ServiceRequest Related Models #
+# ----------------------------------------- #
+
+class Vehicle(models.Model):
+    plate_number = models.CharField(max_length=50, unique=True)
+    make_model = models.CharField(max_length=200, blank=True, null=True)
+    capacity = models.PositiveIntegerField(null=True, blank=True)  # passengers
+    active = models.BooleanField(default=True)
+
+    def __str__(self):
+        return f"{self.plate_number} — {self.make_model or 'Unknown'}"
+
+class MotorpoolRequest(models.Model):
+    """
+    Motorpool-specific details that attach to a ServiceRequest.
+    """
+    service_request = models.OneToOneField(
+        'ServiceRequest', on_delete=models.CASCADE, related_name='motorpool'
+    )
+
+    # vehicle only
+    vehicle = models.ForeignKey(Vehicle, on_delete=models.SET_NULL, null=True, blank=True)
+
+    # request details
+    requesting_office = models.ForeignKey(
+        Department, on_delete=models.SET_NULL, null=True, blank=True
+    )
+
+    purpose = models.TextField(blank=True, null=True)
+    place_to_be_visited = models.CharField(max_length=255, blank=True, null=True)
+    trip_start = models.DateTimeField(null=True, blank=True)
+    trip_end = models.DateTimeField(null=True, blank=True)
+    itinerary = models.TextField(blank=True, null=True)
+    passengers_count = models.PositiveIntegerField(null=True, blank=True)
+    contact_no = models.CharField(max_length=50, blank=True, null=True)
+    contact_person = models.CharField(max_length=255, blank=True, null=True)
+    number_of_days = models.PositiveIntegerField(null=True, blank=True)
+
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self):
+        return f"Motorpool details for Request #{self.service_request.id}"
+
+
+# Fuel PO and line items for Purchase Order for Fuel & Lubricants
+class FuelProduct(models.TextChoices):
+    DIESEL = "Diesel", "Diesel"
+    GAS_UNLEADED = "Gasoline - Unleaded", "Gasoline - Unleaded"
+    GAS_REGULAR = "Gasoline - Regular", "Gasoline - Regular"
+
+class FuelPurchaseOrder(models.Model):
+    service_request = models.OneToOneField('ServiceRequest', on_delete=models.CASCADE, related_name='fuel_po')
+    requesting_office = models.ForeignKey(
+        Department, on_delete=models.SET_NULL, null=True, blank=True
+    )
+    purpose = models.TextField(blank=True, null=True)
+    driver_or_official = models.CharField(max_length=255, blank=True, null=True)
+    vehicle_plate = models.CharField(max_length=100, blank=True, null=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self):
+        return f"Fuel PO for Request #{self.service_request.id}"
+
+class FuelPurchaseLineItem(models.Model):
+    po = models.ForeignKey(FuelPurchaseOrder, on_delete=models.CASCADE, related_name='lines')
+    product = models.CharField(max_length=50, choices=FuelProduct.choices)
+    qty_words = models.CharField(max_length=255, blank=True, null=True)
+    qty_figure = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True)
+    amount = models.DecimalField(max_digits=12, decimal_places=2, null=True, blank=True)
+
+    def __str__(self):
+        return f"{self.product} — {self.qty_figure or 0}"
 
 
 

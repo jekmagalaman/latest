@@ -1,4 +1,4 @@
-function openModal(id, date, requestor, office, unit, description, status, personnel, materials, reports, labor, materials_needed, others_needed) {
+function openModal(id, date, requestor, office, unit, description, status, personnel, materials, reports, labor, materials_needed, others_needed, cancelReason, reqSelectedIndicatorId) {
   document.getElementById("modal-date").textContent = date;
   document.getElementById("modal-requestor").textContent = requestor;
   document.getElementById("modal-office").textContent = office;
@@ -34,11 +34,60 @@ function openModal(id, date, requestor, office, unit, description, status, perso
     case "Emergency": statusElement.classList.add("emergency"); break;
   }
 
+  const cancelReasonEl = document.getElementById("modal-cancel-reason");
+  if (status === "Cancelled" && cancelReason && cancelReason.trim() !== "" && cancelReason !== "None") {
+      cancelReasonEl.innerHTML = `<strong>Reason for Cancellation:</strong><br>${cancelReason}`;
+      cancelReasonEl.style.display = "block";
+  } else {
+      cancelReasonEl.style.display = "none";
+  }
+
   // ===== Approve Form Logic =====
   const approveForm = document.getElementById("approveForm");
   if (approveForm) {
     approveForm.action = `/gso_requests/approve/${id}/`;
     approveForm.style.display = (status === "Pending" && personnel && personnel.trim() !== "") ? "block" : "none";
+  }
+
+  // ===== Success Indicator Form Logic =====
+  const indicatorForm = document.getElementById("indicatorForm");
+  const indicatorSelect = document.querySelector("#indicatorForm select[name='selected_indicator']");
+
+  if (indicatorForm && indicatorSelect) {
+      indicatorForm.action = `/gso_requests/request/${id}/update_indicator/`;
+
+      // Clear existing options
+      indicatorSelect.innerHTML = '<option value="">-- Select Success Indicator --</option>';
+
+      // Populate indicators from Django
+      if (typeof indicators !== 'undefined') {
+          indicators.forEach(si => {
+              const option = document.createElement("option");
+              option.value = si.id;
+              option.textContent = `${si.code} - ${si.description}`;
+
+              if (reqSelectedIndicatorId && parseInt(reqSelectedIndicatorId) === si.id) {
+                  option.selected = true;
+              }
+
+              indicatorSelect.appendChild(option);
+          });
+      }
+
+      // ===== DISABLE SUCCESS INDICATOR WHEN STATUS = COMPLETED =====
+      const saveBtn = indicatorForm.querySelector("button[type='submit']");
+
+      if (status === "Completed") {
+          indicatorSelect.disabled = true;
+          if (saveBtn) saveBtn.disabled = true;
+          indicatorForm.style.opacity = "0.6";
+          indicatorForm.style.pointerEvents = "none";
+      } else {
+          indicatorSelect.disabled = false;
+          if (saveBtn) saveBtn.disabled = false;
+          indicatorForm.style.opacity = "1";
+          indicatorForm.style.pointerEvents = "auto";
+      }
   }
 
   new bootstrap.Modal(document.getElementById("requestModal")).show();

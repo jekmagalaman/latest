@@ -166,8 +166,32 @@ def unit_head_inventory(request):
 
 
 
+@login_required
+@user_passes_test(is_unit_head)
+def unit_head_add_material(request):
+    user = request.user
+    unit = user.unit
 
+    if not unit:
+        return redirect("gso_inventory:unit_head_inventory")
 
+    if request.method == "POST":
+        form = InventoryItemForm(request.POST)
+        if form.is_valid():
+            item = form.save(commit=False)
+            item.owned_by = unit  # assign to Unit Head's unit
+            item.save()
+            return redirect("gso_inventory:unit_head_inventory")
+    else:
+        form = InventoryItemForm()
+
+    # hide owned_by for Unit Head
+    form.fields.pop("owned_by", None)
+
+    return render(request, "unit_heads/unit_head_inventory/unit_head_add_item.html", {
+        "form": form,
+        "unit": unit,
+    })
 
 
 

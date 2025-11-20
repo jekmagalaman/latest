@@ -71,23 +71,26 @@
           </td>
           <td class="text-center">
             <button class="btn btn-sm btn-outline-primary px-2"
-              onclick="openModal(
-                '{{ req.id }}',
-                '{{ req.created_at|date:"Y-m-d" }}',
-                '{{ req.custom_full_name|default:req.requestor.username|escapejs }}',
-                '{{ req.requestor.department|escapejs }}',
-                '{{ req.unit.name|escapejs }}',
-                '{{ req.description|escapejs }}',
-                '{{ req.status|escapejs }}',
-                '{{ req.assigned_personnel_names|escapejs }}',
-                `{% for rm in req.requestmaterial_set.all %}{{ rm.material.name|escapejs }} ({{ rm.quantity }} {{ rm.material.unit|escapejs }}){% if not forloop.last %}, {% endif %}{% endfor %}`,
-                `{% for r in req.reports.all %}<strong>{{ r.personnel.get_full_name|escapejs }}</strong> ({{ r.created_at|date:"Y-m-d H:i" }}): {{ r.report_text|escapejs }}<br>{% endfor %}`,
-                '{{ req.labor }}',
-                '{{ req.materials_needed }}',
-                '{{ req.others_needed }}'
-              )">
-              <i class="bi bi-eye"></i> View
+                    onclick="openModal(
+                      '{{ req.id }}',
+                      '{{ req.created_at|date:"Y-m-d" }}',
+                      '{{ req.custom_full_name|default:req.requestor.username|escapejs }}',
+                      '{{ req.requestor.department|escapejs }}',
+                      '{{ req.unit.name|escapejs }}',
+                      '{{ req.description|escapejs }}',
+                      '{{ req.status|escapejs }}',
+                      '{{ req.assigned_personnel_names|escapejs }}',
+                      `{% for rm in req.requestmaterial_set.all %}{{ rm.material.name|escapejs }} ({{ rm.quantity }} {{ rm.material.unit|escapejs }}){% if not forloop.last %}, {% endif %}{% endfor %}`,
+                      `{% for r in req.reports.all %}<strong>{{ r.personnel.get_full_name|escapejs }}</strong> ({{ r.created_at|date:"Y-m-d H:i" }}): {{ r.report_text|escapejs }}<br>{% endfor %}`,
+                      '{{ req.labor }}',
+                      '{{ req.materials_needed }}',
+                      '{{ req.others_needed }}',
+                      '{{ req.cancel_reason|default:""|escapejs }}',  <!-- 14th: cancelReason -->
+                      '{{ req.selected_indicator.id|default:""|escapejs }}'  <!-- 15th: reqSelectedIndicatorId -->
+                    )">
+                <i class="bi bi-eye"></i> View
             </button>
+
           </td>
         </tr>
         {% empty %}
@@ -146,6 +149,27 @@
         </div>
 
         <div class="modal-section">
+          <h6 class="section-title">Success Indicator</h6>
+
+          {% if user.role == "personnel" or user.role == "director" or user.role == "gso" %}
+            <form id="indicatorForm" method="POST">
+              {% csrf_token %}
+              <select name="selected_indicator" class="form-select mb-2">
+                <!-- options populated dynamically by JS -->
+              </select>
+              <button type="submit" class="btn btn-success btn-sm">
+                <i class="bi bi-save me-1"></i> Save Indicator
+              </button>
+            </form>
+          {% else %}
+            <p class="text-muted" id="modal-indicator-display">
+              <!-- populated dynamically by JS -->
+            </p>
+          {% endif %}
+        </div>
+
+
+        <div class="modal-section">
           <h6 class="section-title">Status</h6>
           <span id="modal-status" class="status-badge 
                 {% if req.status == 'Pending' %}pending
@@ -156,16 +180,19 @@
                 {% elif req.status == 'Cancelled' %}cancelled
                 {% elif req.status == 'Emergency' %}emergency
                 {% endif %}">
-            {% if req.is_emergency %}
-              <span>
-                <img src="{% static 'images/emergency.png' %}" 
-                    alt="Emergency" 
-                    class="status-emergency-icon">
-              </span>
-            {% endif %}
+              {% if req.is_emergency %}
+                <span>
+                  <img src="{% static 'images/emergency.png' %}" 
+                      alt="Emergency" 
+                      class="status-emergency-icon">
+                </span>
+              {% endif %}
 
-            {{ req.status }}
+              {{ req.status }}
           </span>
+
+          <!-- CANCEL REASON -->
+          <p id="modal-cancel-reason" class="text-danger mt-2" style="display:none;"></p>
         </div>
       </div>
 
@@ -184,7 +211,12 @@
 </div>
 
 {% block extra_js %}
+<script type="text/javascript">
+  // Make Django indicators available in JS
+  const indicators = {{ indicators|safe }};
+</script>
 <script src="{% static 'js/gso/request_management.js' %}"></script>
 {% endblock %}
+
 
 {% endblock %}

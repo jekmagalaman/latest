@@ -12,6 +12,8 @@ urlpatterns = [
 
     # GSO Office
     path('management/', views.request_management, name='request_management'),
+    path('request/<int:pk>/update_indicator/', views.update_success_indicator, name='update_success_indicator'),
+
 
     # Unit Head
     path('unit-head/management/', views.unit_head_request_management, name='unit_head_request_management'),
@@ -40,4 +42,8 @@ urlpatterns = [
 
     # Feedback
     path('submit_feedback/', views.submit_feedback, name='submit_feedback'),
+
+    #Motorpool
+    path("requestor/motorpool/create/", views.add_motorpool_request, name="create_motorpool_request"),
+    path("requestor/fuel-po/create/", views.create_fuel_po_request, name="create_fuel_po_request"),
 ]

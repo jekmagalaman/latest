@@ -2,6 +2,8 @@
 
 {% block title %}Request Management{% endblock %}
 
+{% load static %}
+
 
 
 <!-- Header -->
@@ -59,16 +61,25 @@
           <td>{{ req.unit.name }}</td>
           <td>{{ req.assigned_personnel_names|default:"— Unassigned —" }}</td>
           <td>
-            <span class="status-badge {% if req.status == 'Pending' %}pending
-                                      {% elif req.status == 'Approved' %}approved
-                                      {% elif req.status == 'In Progress' %}in-progress
-                                      {% elif req.status == 'Done for Review' %}review
-                                      {% elif req.status == 'Completed' %}completed
-                                      {% elif req.status == 'Cancelled' %}cancelled
-                                      {% elif req.status == 'Emergency' %}emergency
-                                      {% endif %}">
+            <span id="modal-status" class="status-badge 
+                {% if req.status == 'Pending' %}pending
+                {% elif req.status == 'Approved' %}approved
+                {% elif req.status == 'In Progress' %}in-progress
+                {% elif req.status == 'Done for Review' %}review
+                {% elif req.status == 'Completed' %}completed
+                {% elif req.status == 'Cancelled' %}cancelled
+                {% elif req.status == 'Emergency' %}emergency
+                {% endif %}">
+              {% if req.is_emergency %}
+                <span>
+                  <img src="{% static 'images/emergency.png' %}" 
+                      alt="Emergency" 
+                      class="status-emergency-icon">
+                </span>
+              {% endif %}
+
               {{ req.status }}
-            </span>
+          </span>
           </td>
           <td class="text-center">
             <a href="{% url 'gso_requests:unit_head_request_detail' req.id %}" class="btn btn-sm btn-outline-primary px-2">

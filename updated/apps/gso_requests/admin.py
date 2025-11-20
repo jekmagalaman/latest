@@ -1,6 +1,5 @@
 from django.contrib import admin
-from .models import ServiceRequest, RequestMaterial, TaskReport
-
+from .models import ServiceRequest, RequestMaterial, TaskReport, Vehicle
 from auditlog.mixins import AuditlogHistoryAdminMixin
 from auditlog.models import LogEntry
 
@@ -121,3 +120,13 @@ class ServiceRequestAdmin(AuditlogHistoryAdminMixin, admin.ModelAdmin):
 
         pretty = json.dumps(data, indent=2, default=str)
         return format_html("<pre style='max-height:300px; overflow:auto;'>{}</pre>", pretty)
+    
+# -----------------------------
+# Vehicle Admin
+# -----------------------------
+@admin.register(Vehicle)
+class VehicleAdmin(admin.ModelAdmin):
+    list_display = ('plate_number', 'make_model', 'capacity', 'active')
+    search_fields = ('plate_number', 'make_model')
+    list_filter = ('active',)
+

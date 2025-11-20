@@ -3,84 +3,94 @@
 
 {% block title %}Feedback Reports{% endblock %}
 
+
+
+
+
+<!-- ===== HEADER ===== -->
+{% block page_header %}
+<h1 class="page-title mb-0">Client Satisfaction Feedbacks</h1>
+{% endblock %}
+
+{% block page_filter %}
+<button class="btn btn-success" data-bs-toggle="modal" data-bs-target="#csvModal">
+  <i class="bi bi-download"></i> Download CSV
+</button>
+{% endblock %}
+
+
+
+
+
+
 {% block main_content %}
 <div class="container mt-4">
-
-  <!-- HEADER -->
-  <div class="d-flex justify-content-between align-items-center mb-3">
-    <h4>📋 Client Satisfaction Feedbacks</h4>
-
-    <!-- OPEN MODAL BUTTON -->
-    <button class="btn btn-success" data-bs-toggle="modal" data-bs-target="#csvModal">
-      <i class="bi bi-download"></i> Download CSV
-    </button>
-  </div>
-
   <!-- TABLE -->
-  <div class="table-responsive">
-    <table class="table table-bordered table-hover align-middle">
-      <thead class="table-light">
-        <tr>
-          <th>#</th>
-          <th>Request ID</th>
-          <th>Unit</th>
-          <th>Requestor Name</th>
-          <th>Requestor Email</th>
-          <th>Average Rating</th>
-          <th>Suggestions</th>
-          <th>Date Submitted</th>
-        </tr>
-      </thead>
-
-      <tbody>
-        {% for fb in feedback_list %}
-        <tr>
-          <td>{{ forloop.counter }}</td>
-          <td>{{ fb.request.id }}</td>
-
-          <!-- UNIT -->
-          <td>
-            {% if fb.request.unit %}
-              {{ fb.request.unit.name }}
-            {% else %}
-              —
-            {% endif %}
-          </td>
-
-          <!-- NAME -->
-          <td>
-            {% if fb.request.custom_full_name %}
-              {{ fb.request.custom_full_name }}
-            {% elif fb.request.requestor %}
-              {{ fb.request.requestor.get_full_name }}
-            {% else %}
-              —
-            {% endif %}
-          </td>
-
-          <!-- EMAIL -->
-          <td>
-            {% if fb.request.custom_email %}
-              {{ fb.request.custom_email }}
-            {% elif fb.request.requestor %}
-              {{ fb.request.requestor.email }}
-            {% else %}
-              —
-            {% endif %}
-          </td>
-
-          <td>{{ fb.average_rating|default:"0.00" }}</td>
-          <td>{{ fb.suggestions|default:"—" }}</td>
-          <td>{{ fb.date_submitted|date:"Y-m-d H:i" }}</td>
-        </tr>
-
-        {% empty %}
-        <tr>
-          <td colspan="8" class="text-center text-muted">No feedback submissions yet.</td>
-        </tr>
-        {% endfor %}
-      </tbody>
-    </table>
+  <div class="table-container">
+    <div class="table-responsive">
+      <table class="table align-middle table-hover request-table">
+        <thead class="table-light">
+          <tr>
+            <th>#</th>
+            <th>Request ID</th>
+            <th>Unit</th>
+            <th>Requestor Name</th>
+            <th>Requestor Email</th>
+            <th>Average Rating</th>
+            <th>Suggestions</th>
+            <th>Date Submitted</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for fb in feedback_list %}
+          <tr>
+            <td>{{ forloop.counter }}</td>
+            <td>{{ fb.request.id }}</td>
+  
+            <!-- UNIT -->
+            <td>
+              {% if fb.request.unit %}
+                {{ fb.request.unit.name }}
+              {% else %}
+                —
+              {% endif %}
+            </td>
+  
+            <!-- NAME -->
+            <td>
+              {% if fb.request.custom_full_name %}
+                {{ fb.request.custom_full_name }}
+              {% elif fb.request.requestor %}
+                {{ fb.request.requestor.get_full_name }}
+              {% else %}
+                —
+              {% endif %}
+            </td>
+  
+            <!-- EMAIL -->
+            <td>
+              {% if fb.request.custom_email %}
+                {{ fb.request.custom_email }}
+              {% elif fb.request.requestor %}
+                {{ fb.request.requestor.email }}
+              {% else %}
+                —
+              {% endif %}
+            </td>
+  
+            <td>{{ fb.average_rating|default:"0.00" }}</td>
+            <td>{{ fb.suggestions|default:"—" }}</td>
+            <td>{{ fb.date_submitted|date:"Y-m-d H:i" }}</td>
+          </tr>
+  
+          {% empty %}
+          <tr>
+            <td colspan="8" class="text-center text-muted">No feedback submissions yet.</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
   </div>
 </div>
 
@@ -153,3 +163,17 @@ document.getElementById("filterType").addEventListener("change", function () {
 </script>
 
 {% endblock %}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
